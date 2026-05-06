@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CinéScope</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=DM+Serif+Display&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- AUTH SCREEN -->
+  <div id="screen-auth" class="screen active">
+    <div class="auth-wrap">
+      <div class="auth-logo">
+        <span class="logo-icon">◈</span>
+        <span class="logo-text">CinéScope</span>
+      </div>
+      <p class="auth-sub">Ton assistant film personnel — partout, tout le temps.</p>
+
+      <div id="auth-login">
+        <div class="field-group">
+          <label>Email</label>
+          <input type="email" id="auth-email" placeholder="ton@email.com">
+        </div>
+        <div class="field-group">
+          <label>Mot de passe</label>
+          <input type="password" id="auth-password" placeholder="••••••••">
+        </div>
+        <div id="auth-error" class="auth-error"></div>
+        <button class="btn-full" onclick="Auth.login()">Se connecter</button>
+        <button class="btn-text" onclick="Auth.showRegister()">Pas de compte ? S'inscrire</button>
+      </div>
+
+      <div id="auth-register" style="display:none">
+        <div class="field-group">
+          <label>Email</label>
+          <input type="email" id="reg-email" placeholder="ton@email.com">
+        </div>
+        <div class="field-group">
+          <label>Mot de passe</label>
+          <input type="password" id="reg-password" placeholder="••••••••">
+        </div>
+        <div class="field-group">
+          <label>Pseudo Letterboxd</label>
+          <input type="text" id="reg-letterboxd" placeholder="AdrianoB23_">
+        </div>
+        <div id="reg-error" class="auth-error"></div>
+        <button class="btn-full" onclick="Auth.register()">Créer mon compte</button>
+        <button class="btn-text" onclick="Auth.showLogin()">Déjà un compte ? Se connecter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ONBOARDING -->
+  <div id="screen-onboarding" class="screen">
+    <div class="onboard-wrap">
+      <div class="onboard-step" id="ob-1">
+        <div class="ob-head">
+          <span class="ob-num">1 / 3</span>
+          <h2>Tes plateformes</h2>
+          <p>On ne te recommande que ce qui est accessible.</p>
+        </div>
+        <div class="platform-grid" id="ob-platforms">
+          <div class="plat-btn" data-p="Netflix">Netflix</div>
+          <div class="plat-btn" data-p="Prime Video">Prime Video</div>
+          <div class="plat-btn" data-p="Canal+">Canal+</div>
+          <div class="plat-btn" data-p="Disney+">Disney+</div>
+          <div class="plat-btn" data-p="Apple TV+">Apple TV+</div>
+          <div class="plat-btn" data-p="OCS">OCS</div>
+          <div class="plat-btn" data-p="Mubi">Mubi</div>
+          <div class="plat-btn" data-p="Cinéma">Cinéma</div>
+        </div>
+        <button class="btn-full" onclick="Onboard.next(2)">Suivant →</button>
+      </div>
+
+      <div class="onboard-step" id="ob-2" style="display:none">
+        <div class="ob-head">
+          <span class="ob-num">2 / 3</span>
+          <h2>Tes genres favoris</h2>
+          <p>Sélectionne tout ce qui te parle.</p>
+        </div>
+        <div class="genre-grid" id="ob-genres">
+          <div class="genre-btn" data-g="Thriller">Thriller</div>
+          <div class="genre-btn" data-g="Drame">Drame</div>
+          <div class="genre-btn" data-g="Science-fiction">Science-fiction</div>
+          <div class="genre-btn" data-g="Action">Action</div>
+          <div class="genre-btn" data-g="Comédie">Comédie</div>
+          <div class="genre-btn" data-g="Horreur">Horreur</div>
+          <div class="genre-btn" data-g="Crime">Crime</div>
+          <div class="genre-btn" data-g="Animation">Animation</div>
+          <div class="genre-btn" data-g="Documentaire">Documentaire</div>
+          <div class="genre-btn" data-g="Romance">Romance</div>
+          <div class="genre-btn" data-g="Aventure">Aventure</div>
+          <div class="genre-btn" data-g="Indie / Arthouse">Indie / Arthouse</div>
+        </div>
+        <button class="btn-full" onclick="Onboard.next(3)">Suivant →</button>
+      </div>
+
+      <div class="onboard-step" id="ob-3" style="display:none">
+        <div class="ob-head">
+          <span class="ob-num">3 / 3</span>
+          <h2>Profil de ta copine</h2>
+          <p>Pour les soirées ensemble, on équilibre les deux.</p>
+        </div>
+        <div class="genre-grid" id="ob-gf-genres">
+          <div class="genre-btn" data-g="Feel-good">Feel-good</div>
+          <div class="genre-btn" data-g="Comédie romantique">Comédie romantique</div>
+          <div class="genre-btn" data-g="Drame">Drame</div>
+          <div class="genre-btn" data-g="Romance">Romance</div>
+          <div class="genre-btn" data-g="Thriller">Thriller</div>
+          <div class="genre-btn" data-g="Animation">Animation</div>
+          <div class="genre-btn" data-g="Action">Action</div>
+          <div class="genre-btn" data-g="Comédie">Comédie</div>
+        </div>
+        <button class="btn-full" onclick="Onboard.finish()">Commencer →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="screen-app" class="screen">
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-page="reco" onclick="Nav.goto('reco', this)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+        <span>Soir</span>
+      </button>
+      <button class="nav-btn" data-page="films" onclick="Nav.goto('films', this)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="2" y1="17" x2="7" y2="17"/></svg>
+        <span>Films</span>
+      </button>
+      <button class="nav-btn" data-page="settings" onclick="Nav.goto('settings', this)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <span>Profil</span>
+      </button>
+    </nav>
+
+    <!-- RECO PAGE -->
+    <div id="page-reco" class="page active">
+      <div id="wizard-container">
+        <header class="page-header">
+          <span class="logo-sm">◈ CinéScope</span>
+          <button class="btn-icon" onclick="Auth.logout()" title="Déconnexion">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </header>
+
+        <div class="wizard-body">
+          <!-- Step 1 : Qui -->
+          <div class="wstep active" id="ws-1">
+            <h2 class="wstep-title">On regarde à combien ?</h2>
+            <div class="who-grid">
+              <div class="who-card active" id="who-solo" onclick="Wizard.setWho('solo', this)">
+                <div class="who-icon">◎</div>
+                <div class="who-label">Seul</div>
+              </div>
+              <div class="who-card" id="who-couple" onclick="Wizard.setWho('couple', this)">
+                <div class="who-icon">◉</div>
+                <div class="who-label">En couple</div>
+              </div>
+            </div>
+            <button class="btn-full" onclick="Wizard.goTo(2)">Suivant</button>
+          </div>
+
+          <!-- Step 2 : Mood -->
+          <div class="wstep" id="ws-2">
+            <h2 class="wstep-title">C'est quoi l'ambiance ?</h2>
+            <p class="wstep-sub">Plusieurs choix possibles.</p>
+            <div class="mood-grid">
+              <div class="mood-card" data-mood="Détente" onclick="Wizard.toggleMood(this)">
+                <div class="mood-icon">◐</div>
+                <div class="mood-label">Détente</div>
+                <div class="mood-sub">Feel-good, cosy</div>
+              </div>
+              <div class="mood-card" data-mood="Adrénaline" onclick="Wizard.toggleMood(this)">
+                <div class="mood-icon">◆</div>
+                <div class="mood-label">Adrénaline</div>
+                <div class="mood-sub">Action, thriller</div>
+              </div>
+              <div class="mood-card" data-mood="Réflexion" onclick="Wizard.toggleMood(this)">
+                <div class="mood-icon">◇</div>
+                <div class="mood-label">Réflexion</div>
+                <div class="mood-sub">Drame, arthouse</div>
+              </div>
+              <div class="mood-card" data-mood="Rire" onclick="Wizard.toggleMood(this)">
+                <div class="mood-icon">◑</div>
+                <div class="mood-label">Rire</div>
+                <div class="mood-sub">Comédie légère</div>
+              </div>
+              <div class="mood-card" data-mood="Frissons" onclick="Wizard.toggleMood(this)">
+                <div class="mood-icon">◀</div>
+                <div class="mood-label">Frissons</div>
+                <div class="mood-sub">Horreur, suspense</div>
+              </div>
+              <div class="mood-card" data-mood="Aventure" onclick="Wizard.toggleMood(this)">
+                <div class="mood-icon">▶</div>
+                <div class="mood-label">Aventure</div>
+                <div class="mood-sub">Épique, voyage</div>
+              </div>
+            </div>
+            <div class="step-nav">
+              <button class="btn-sec" onclick="Wizard.goTo(1)">← Retour</button>
+              <button class="btn-full" onclick="Wizard.goTo(3)" style="flex:1">Suivant</button>
+            </div>
+          </div>
+
+          <!-- Step 3 : Durée + Époque -->
+          <div class="wstep" id="ws-3">
+            <h2 class="wstep-title">Quelques préférences</h2>
+            <div class="pref-section">
+              <label class="pref-label">Durée max</label>
+              <div class="slider-row">
+                <span class="slider-side">1h</span>
+                <input type="range" id="dur-slider" min="60" max="240" value="150" step="10" oninput="Wizard.updateDur(this.value)">
+                <span class="slider-side" id="dur-val">2h30</span>
+              </div>
+            </div>
+            <div class="pref-section">
+              <label class="pref-label">Époque</label>
+              <div class="chips" id="epoch-chips">
+                <div class="chip active" data-v="all" onclick="Wizard.toggleChip(this, 'epoch')">Peu importe</div>
+                <div class="chip" data-v="classic" onclick="Wizard.toggleChip(this, 'epoch')">Avant 1980</div>
+                <div class="chip" data-v="80-90" onclick="Wizard.toggleChip(this, 'epoch')">80-90s</div>
+                <div class="chip" data-v="2000s" onclick="Wizard.toggleChip(this, 'epoch')">2000-2010</div>
+                <div class="chip" data-v="recent" onclick="Wizard.toggleChip(this, 'epoch')">2010+</div>
+              </div>
+            </div>
+            <div class="step-nav">
+              <button class="btn-sec" onclick="Wizard.goTo(2)">← Retour</button>
+              <button class="btn-full" onclick="Wizard.goTo(4)" style="flex:1">Suivant</button>
+            </div>
+          </div>
+
+          <!-- Step 4 : Extras -->
+          <div class="wstep" id="ws-4">
+            <h2 class="wstep-title">Des envies particulières ?</h2>
+            <p class="wstep-sub">Optionnel — laisse vide pour une surprise.</p>
+            <div class="chips" id="extra-chips">
+              <div class="chip" data-v="culte" onclick="Wizard.toggleChip(this, 'extra')">Film culte</div>
+              <div class="chip" data-v="indie" onclick="Wizard.toggleChip(this, 'extra')">Indie / Arthouse</div>
+              <div class="chip" data-v="noneng" onclick="Wizard.toggleChip(this, 'extra')">Non-anglophone</div>
+              <div class="chip" data-v="livre" onclick="Wizard.toggleChip(this, 'extra')">Adapté d'un livre</div>
+              <div class="chip" data-v="prix" onclick="Wizard.toggleChip(this, 'extra')">Oscar / Cannes</div>
+              <div class="chip" data-v="realist" onclick="Wizard.toggleChip(this, 'extra')">Réalisateur favori</div>
+              <div class="chip" data-v="saga" onclick="Wizard.toggleChip(this, 'extra')">Saga / Suite</div>
+              <div class="chip" data-v="surprise" onclick="Wizard.toggleChip(this, 'extra')">Surprise totale</div>
+            </div>
+            <div class="step-nav">
+              <button class="btn-sec" onclick="Wizard.goTo(3)">← Retour</button>
+              <button class="btn-full btn-accent" onclick="Wizard.launch()" style="flex:1">✦ Trouver mon film</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress dots -->
+        <div class="wiz-dots" id="wiz-dots">
+          <div class="dot active" onclick="Wizard.goTo(1)"></div>
+          <div class="dot" onclick="Wizard.goTo(2)"></div>
+          <div class="dot" onclick="Wizard.goTo(3)"></div>
+          <div class="dot" onclick="Wizard.goTo(4)"></div>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div id="reco-loading" style="display:none">
+        <div class="loading-screen">
+          <div class="loading-logo">◈</div>
+          <p class="loading-msg" id="loading-msg">Analyse de ton historique…</p>
+          <div class="loading-track"><div class="loading-bar" id="loading-bar"></div></div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="reco-results" style="display:none">
+        <header class="page-header">
+          <span class="logo-sm">◈ Ce soir</span>
+          <button class="btn-text-sm" onclick="Wizard.reset()">Recommencer</button>
+        </header>
+        <div class="results-meta" id="results-meta"></div>
+        <div id="reco-list" class="reco-list"></div>
+        <div class="results-footer">
+          <button class="btn-sec-full" onclick="AI.moreRecos()">Voir plus de suggestions →</button>
+        </div>
+      </div>
+
+      <!-- Detail panel -->
+      <div id="film-detail" style="display:none">
+        <header class="page-header">
+          <button class="btn-icon" onclick="Detail.close()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          </button>
+          <span class="logo-sm">Détail</span>
+          <div style="width:32px"></div>
+        </header>
+        <div id="detail-content"></div>
+      </div>
+    </div>
+
+    <!-- FILMS PAGE -->
+    <div id="page-films" class="page">
+      <header class="page-header">
+        <span class="logo-sm">◈ Mes films</span>
+        <button class="btn-icon" onclick="Films.showAddForm()" title="Ajouter">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </header>
+
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-n" id="stat-total">0</div><div class="stat-l">films vus</div></div>
+        <div class="stat-card"><div class="stat-n" id="stat-avg">—</div><div class="stat-l">note moy.</div></div>
+        <div class="stat-card"><div class="stat-n" id="stat-fav">0</div><div class="stat-l">coups de ♥</div></div>
+      </div>
+
+      <div class="search-bar">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="film-search" placeholder="Rechercher…" oninput="Films.filter(this.value)">
+      </div>
+
+      <!-- Import -->
+      <div class="import-zone" id="import-zone">
+        <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="Films.importCSV(this)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <div>
+          <div class="import-title" onclick="document.getElementById('csv-input').click()">Importer depuis Letterboxd</div>
+          <div class="import-sub">Paramètres Letterboxd → Exporter → watched.csv</div>
+        </div>
+        <div id="import-status"></div>
+      </div>
+
+      <!-- Add form -->
+      <div id="add-form" class="add-form" style="display:none">
+        <input type="text" id="new-title" placeholder="Titre du film" class="add-input">
+        <input type="text" id="new-year" placeholder="Année" class="add-input" style="width:80px">
+        <div class="star-input" id="star-input">
+          <span class="star-btn" data-s="1" onclick="Films.setStar(1)">★</span>
+          <span class="star-btn" data-s="2" onclick="Films.setStar(2)">★</span>
+          <span class="star-btn" data-s="3" onclick="Films.setStar(3)">★</span>
+          <span class="star-btn" data-s="4" onclick="Films.setStar(4)">★</span>
+          <span class="star-btn" data-s="5" onclick="Films.setStar(5)">★</span>
+        </div>
+        <button class="btn-sm" onclick="Films.add()">Ajouter</button>
+        <button class="btn-sm btn-ghost" onclick="Films.hideAddForm()">Annuler</button>
+      </div>
+
+      <div id="film-list" class="film-list"></div>
+    </div>
+
+    <!-- SETTINGS PAGE -->
+    <div id="page-settings" class="page">
+      <header class="page-header">
+        <span class="logo-sm">◈ Profil</span>
+        <span id="user-email-display" style="font-size:12px;opacity:.5"></span>
+      </header>
+
+      <div class="settings-section">
+        <div class="settings-title">Mes plateformes</div>
+        <div class="platform-grid" id="settings-platforms">
+          <div class="plat-btn" data-p="Netflix">Netflix</div>
+          <div class="plat-btn" data-p="Prime Video">Prime Video</div>
+          <div class="plat-btn" data-p="Canal+">Canal+</div>
+          <div class="plat-btn" data-p="Disney+">Disney+</div>
+          <div class="plat-btn" data-p="Apple TV+">Apple TV+</div>
+          <div class="plat-btn" data-p="OCS">OCS</div>
+          <div class="plat-btn" data-p="Mubi">Mubi</div>
+          <div class="plat-btn" data-p="Cinéma">Cinéma</div>
+        </div>
+        <button class="btn-sm" onclick="Settings.savePlatforms()">Sauvegarder</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Mes genres favoris</div>
+        <div class="genre-grid" id="settings-genres">
+          <div class="genre-btn" data-g="Thriller">Thriller</div>
+          <div class="genre-btn" data-g="Drame">Drame</div>
+          <div class="genre-btn" data-g="Science-fiction">Science-fiction</div>
+          <div class="genre-btn" data-g="Action">Action</div>
+          <div class="genre-btn" data-g="Comédie">Comédie</div>
+          <div class="genre-btn" data-g="Horreur">Horreur</div>
+          <div class="genre-btn" data-g="Crime">Crime</div>
+          <div class="genre-btn" data-g="Animation">Animation</div>
+          <div class="genre-btn" data-g="Documentaire">Documentaire</div>
+          <div class="genre-btn" data-g="Romance">Romance</div>
+          <div class="genre-btn" data-g="Aventure">Aventure</div>
+          <div class="genre-btn" data-g="Indie / Arthouse">Indie / Arthouse</div>
+        </div>
+        <button class="btn-sm" onclick="Settings.saveGenres()">Sauvegarder</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Profil de ma copine</div>
+        <div class="genre-grid" id="settings-gf">
+          <div class="genre-btn" data-g="Feel-good">Feel-good</div>
+          <div class="genre-btn" data-g="Comédie romantique">Comédie romantique</div>
+          <div class="genre-btn" data-g="Drame">Drame</div>
+          <div class="genre-btn" data-g="Romance">Romance</div>
+          <div class="genre-btn" data-g="Thriller">Thriller</div>
+          <div class="genre-btn" data-g="Animation">Animation</div>
+          <div class="genre-btn" data-g="Action">Action</div>
+          <div class="genre-btn" data-g="Comédie">Comédie</div>
+        </div>
+        <button class="btn-sm" onclick="Settings.saveGF()">Sauvegarder</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Clé API Claude</div>
+        <input type="password" id="api-key-input" class="add-input" placeholder="sk-ant-…" style="width:100%;margin-bottom:8px">
+        <p style="font-size:12px;opacity:.5;margin-bottom:8px">Stockée localement sur cet appareil uniquement. Nécessaire pour les recommandations IA.</p>
+        <button class="btn-sm" onclick="Settings.saveAPIKey()">Sauvegarder</button>
+      </div>
+
+      <div class="settings-section" style="border:none">
+        <button class="btn-danger" onclick="Auth.logout()">Se déconnecter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script type="module" src="firebase.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
