@@ -213,26 +213,52 @@ window.AI = {
     const seenTitles = State.films.map(f => f.title).join(", ") || "aucun encore";
     const topRated   = State.films.filter(f => f.rating >= 4).map(f => `${f.title} (${f.rating}★)`).slice(0, 15).join(", ") || "aucun encore";
 
-    const prompt = `Tu es un expert en cinéma qui recommande des films de manière très personnalisée.
+    const ADRIEN_TOP = [
+      "12 Angry Men (5★)", "Parasite (5★)", "Whiplash (5★)", "Taxi Driver (5★)",
+      "The Godfather (5★)", "In the Mood for Love (5★)", "The Lord of the Rings: The Two Towers (5★)",
+      "Good Will Hunting (4.5★)", "Past Lives (4.5★)", "The Matrix (4.5★)",
+      "Dead Poets Society (4.5★)", "The Grand Budapest Hotel (4.5★)", "The Dark Knight (4.5★)",
+      "Mulholland Drive (4.5★)", "All of Us Strangers (4.5★)", "The Elephant Man (4.5★)",
+      "Scarface (4.5★)", "Million Dollar Baby (4.5★)", "Gran Torino (4.5★)",
+      "Se7en (4.5★)", "Gladiator (4.5★)", "GoodFellas (4.5★)", "Incendies (4.5★)",
+      "Le Bonheur (4.5★)", "The Good the Bad and the Ugly (4.5★)", "The Blues Brothers (4.5★)",
+      "La La Land (4.5★)", "Le Samouraï (4.5★)", "The Umbrellas of Cherbourg (4.5★)"
+    ].join(", ");
 
-CONTEXTE UTILISATEUR :
-- Regarde ${w.who === "couple" ? "en couple" : "seul"}
-- Ambiance souhaitée : ${w.moods.length ? w.moods.join(", ") : "peu importe"}
+    const ADRIEN_HATES = [
+      "Glass Onion (1★)", "Wonder Woman 1984 (1★)", "Fifty Shades of Grey (1★)",
+      "Fifty Shades Darker (1★)", "Mean Girls (1.5★)", "Black Widow (1.5★)",
+      "Star Wars Rise of Skywalker (1.5★)", "Presidents (0.5★)"
+    ].join(", ");
+
+    const prompt = `Tu es un expert en cinéma qui recommande des films à Adrien (AdrianoB23_ sur Letterboxd).
+
+PROFIL RÉEL D'ADRIEN (extrait de son vrai historique Letterboxd) :
+
+Films qu'il adore (4.5-5★) : ${ADRIEN_TOP}
+
+Films qu'il déteste (à ne JAMAIS imiter) : ${ADRIEN_HATES}
+
+PATTERNS IDENTIFIÉS :
+- AIME : drames intenses et psychologiques, thrillers cérébraux, grands classiques (Kubrick, Scorsese, Coppola, Lynch), cinéma d'auteur français (Varda, Demy, Melville), épopées ambitieuses (LOTR), films qui demandent de la réflexion, biopics solides, polars, films de gangsters, westerns
+- N'AIME PAS : MCU en général (notes systématiquement basses 1.5-2★), comédies légères françaises bas de gamme, suites sans substance, films trop commerciaux
+
+CONTEXTE CE SOIR :
+- Mode : ${w.who === "couple" ? "en couple avec sa copine" : "seul"}
+- Ambiance : ${w.moods.length ? w.moods.join(", ") : "peu importe"}
 - Durée max : ${fmtDur(w.dur)}
 - Époque : ${w.epoch}
-- Envies particulières : ${w.extras.length ? w.extras.join(", ") : "aucune"}
-- Plateformes disponibles : ${(p.platforms || []).join(", ") || "non précisé"}
-- Genres favoris : ${(p.genres || []).join(", ") || "non précisé"}
-${w.who === "couple" ? `- Genres de sa copine : ${(p.gfGenres || []).join(", ") || "non précisé"}` : ""}
-- Films déjà vus : ${seenTitles.length > 200 ? seenTitles.substring(0, 200) + "..." : seenTitles}
-- Films les mieux notés par l'utilisateur : ${topRated}
-${extra ? `- Demande supplémentaire : ${extra}` : ""}
+- Envies : ${w.extras.length ? w.extras.join(", ") : "aucune"}
+- Plateformes : ${(p.platforms || []).join(", ") || "Netflix, Prime Video, Canal+, Disney+, Apple TV+, OCS"}
+${w.who === "couple" ? "- Copine aime : drames romantiques, feel-good, comédies accessibles — trouver le bon compromis" : ""}
+- Films déjà vus (NE PAS recommander) : ${seenTitles.length > 800 ? seenTitles.substring(0, 800) + "..." : seenTitles}
+${extra ? `- Demande spéciale : ${extra}` : ""}
 
 RÈGLES :
-1. Ne jamais recommander un film déjà vu
-2. Privilégier les films disponibles sur les plateformes listées
-3. Adapter les recommandations au contexte couple si applicable
-4. Justifier chaque recommandation en faisant le lien avec les goûts de l'utilisateur
+1. Ne JAMAIS recommander un film déjà vu
+2. Toujours justifier en citant un film qu'il a aimé ("Comme tu as adoré Whiplash..." ou "Dans la lignée de Parasite...")
+3. Jamais de MCU sauf demande explicite
+4. En mode couple : équilibrer ses goûts pointus avec quelque chose d'accessible pour deux
 
 Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau de 3 objets :
 [
