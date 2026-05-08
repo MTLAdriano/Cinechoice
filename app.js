@@ -897,7 +897,7 @@ window.Watchlist = {
         '</div>' +
         '<div class="wl-actions">' +
           '<button class="wl-btn wl-seen" onclick="Watchlist.markWatched(' + JSON.stringify(f).replace(/"/g,"'") + ')" title="Marquer vu">✓</button>' +
-          '<button class="wl-btn wl-del" onclick="Watchlist.remove('' + f.id + '')" title="Retirer">✕</button>' +
+          '<button class="wl-btn wl-del" onclick="Watchlist.remove(\\'' + f.id + '\\')" title="Retirer">✕</button>' +
         '</div>' +
       '</div>'
     ).join("");
@@ -954,7 +954,7 @@ window.Alice = {
         '</div>' +
         '<div class="film-row-right">' +
           '<div class="film-stars">' + starsHtml(f.rating || 0) + '</div>' +
-          '<button class="del-btn" onclick="Alice.remove('' + f.id + '')">✕</button>' +
+          '<button class="del-btn" onclick="Alice.remove(\\'' + f.id + '\\')">✕</button>' +
         '</div>' +
       '</div>'
     ).join("");
