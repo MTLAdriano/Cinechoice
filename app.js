@@ -85,10 +85,10 @@ async function fetchBackdrop(title, year) {
 }
 
 function getOMDbKey() {
-  return localStorage.getItem("cinescope_omdbkey") || (State.profile && State.profile.omdbKey) || "440a1f7";
+  return localStorage.getItem("cinescope_omdbkey") || (State.profile && State.profile.omdbKey) || "";
 }
 function getYouTubeKey() {
-  return localStorage.getItem("cinescope_youtubekey") || (State.profile && State.profile.youtubeKey) || "AIzaSyA2Ey5MFtbG_pyRxTjUBF6TV-UTHnBZws4";
+  return localStorage.getItem("cinescope_youtubekey") || (State.profile && State.profile.youtubeKey) || "";
 }
 
 async function fetchOMDb(title, year) {
