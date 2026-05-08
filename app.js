@@ -45,7 +45,7 @@ function getAPIKey() {
   return localStorage.getItem("cinescope_apikey") || "";
 }
 function getTMDBKey() {
-  return localStorage.getItem("cinescope_tmdbkey") || "74161f0d7da9c0be2ec68049de45e9e7";
+  return localStorage.getItem("cinescope_tmdbkey") || "";
 }
 async function tmdbSearch(title, year) {
   const key = getTMDBKey();
@@ -687,12 +687,14 @@ window.Settings = {
     }
   },
   saveTMDBKey() {
-    const val = $("tmdb-key-input").value.trim();
-    if (val && !val.startsWith("•")) {
-      localStorage.setItem("cinescope_tmdbkey", val);
-      toast("Clé TMDB sauvegardée !");
-      $("tmdb-key-input").value = "••••••••••••••••";
-    }
+    const input = $("tmdb-key-input");
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val || val.startsWith("•")) { toast("Entre une clé TMDB valide.", "warn"); return; }
+    localStorage.setItem("cinescope_tmdbkey", val);
+    toast("Clé TMDB sauvegardée ✓");
+    input.value = "••••••••••••••••";
+    console.log("TMDB key saved:", val.substring(0,8) + "...");
   }
 };
 
