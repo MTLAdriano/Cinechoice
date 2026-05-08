@@ -1,638 +1,253 @@
-// app.js — CinéScope : logique principale
-import {
-  fbRegister, fbLogin, fbLogout, fbOnAuth,
-  fbGetProfile, fbSaveProfile,
-  fbGetFilms, fbAddFilm, fbDeleteFilm, fbBulkAddFilms
-} from "./firebase.js";
-
-// ─── ÉTAT GLOBAL ───────────────────────────────────────────────────────────────
-const State = {
-  user:     null,
-  profile:  null,
-  films:    [],
-  addStar:  0,
-  wizard: {
-    who:    "solo",
-    moods:  [],
-    dur:    150,
-    epoch:  "all",
-    extras: []
-  }
-};
-
-// ─── UTILS ─────────────────────────────────────────────────────────────────────
-function $(id) { return document.getElementById(id); }
-function showScreen(name) {
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-  $(`screen-${name}`).classList.add("active");
-}
-function toast(msg, type = "ok") {
-  const el = document.createElement("div");
-  el.className = `toast toast-${type}`;
-  el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 3000);
-}
-function starsHtml(n, max = 5) {
-  return "★".repeat(n) + "☆".repeat(max - n);
-}
-function fmtDur(min) {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m ? `${h}h${m}` : `${h}h`;
-}
-function getAPIKey() {
-  return localStorage.getItem("cinescope_apikey") || "";
+/* CinéChoice — Dark Emerald Netflix-like */
+:root {
+  --bg:        #0a0f0a;
+  --bg2:       #111811;
+  --bg3:       #1a241a;
+  --border:    #1e2e1e;
+  --text:      #f0f7f0;
+  --text2:     #8ab48a;
+  --text3:     #4a6e4a;
+  --accent:    #1db954;
+  --accent2:   #17a349;
+  --accent-dim:#0d3d21;
+  --danger:    #e05050;
+  --radius:    10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
 }
 
-// ─── AUTH ──────────────────────────────────────────────────────────────────────
-window.Auth = {
-  showRegister() {
-    $("auth-login").style.display    = "none";
-    $("auth-register").style.display = "block";
-  },
-  showLogin() {
-    $("auth-register").style.display = "none";
-    $("auth-login").style.display    = "block";
-  },
-  async login() {
-    const email    = $("auth-email").value.trim();
-    const password = $("auth-password").value;
-    $("auth-error").textContent = "";
-    try {
-      await fbLogin(email, password);
-    } catch (e) {
-      $("auth-error").textContent = "Email ou mot de passe incorrect.";
-    }
-  },
-  async register() {
-    const email      = $("reg-email").value.trim();
-    const password   = $("reg-password").value;
-    const letterboxd = $("reg-letterboxd").value.trim();
-    $("reg-error").textContent = "";
-    if (password.length < 6) { $("reg-error").textContent = "Mot de passe trop court (6 car. min)."; return; }
-    try {
-      await fbRegister(email, password, letterboxd);
-    } catch (e) {
-      $("reg-error").textContent = "Cet email est déjà utilisé.";
-    }
-  },
-  async logout() {
-    await fbLogout();
-    State.user    = null;
-    State.profile = null;
-    State.films   = [];
-    showScreen("auth");
-  }
-};
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
 
-// ─── ONBOARDING ────────────────────────────────────────────────────────────────
-window.Onboard = {
-  next(step) {
-    document.querySelectorAll(".onboard-step").forEach(s => s.style.display = "none");
-    $(`ob-${step}`).style.display = "block";
-  },
-  async finish() {
-    const platforms = [...document.querySelectorAll("#ob-platforms .plat-btn.active")].map(b => b.dataset.p);
-    const genres    = [...document.querySelectorAll("#ob-genres .genre-btn.active")].map(b => b.dataset.g);
-    const gfGenres  = [...document.querySelectorAll("#ob-gf-genres .genre-btn.active")].map(b => b.dataset.g);
-    await fbSaveProfile(State.user.uid, { platforms, genres, gfGenres, onboarded: true });
-    State.profile = { ...State.profile, platforms, genres, gfGenres, onboarded: true };
-    Settings.syncUI();
-    showScreen("app");
-    Nav.goto("reco");
-  }
-};
-// Toggle générique pour les grilles de boutons
-document.querySelectorAll(".plat-btn, .genre-btn").forEach(btn => {
-  btn.addEventListener("click", () => btn.classList.toggle("active"));
-});
+/* SCREENS */
+.screen{display:none;min-height:100vh}
+.screen.active{display:flex;flex-direction:column}
 
-// ─── NAVIGATION ────────────────────────────────────────────────────────────────
-window.Nav = {
-  goto(page, btn) {
-    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-    $(`page-${page}`).classList.add("active");
-    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
-    if (btn) btn.classList.add("active");
-    else document.querySelector(`.nav-btn[data-page="${page}"]`)?.classList.add("active");
-    if (page === "films") Films.render();
-    if (page === "settings") Settings.syncUI();
-  }
-};
+/* AUTH */
+#screen-auth{align-items:center;justify-content:center;padding:2rem 1rem;background:radial-gradient(ellipse at top,#0d2e1a 0%,var(--bg) 60%)}
+.auth-wrap{width:100%;max-width:360px}
+.auth-logo{display:flex;align-items:center;gap:12px;margin-bottom:.5rem}
+.logo-icon{font-size:32px;color:var(--accent)}
+.logo-text{font-size:24px;font-weight:600;letter-spacing:-.03em;color:var(--text)}
+.auth-sub{color:var(--text2);font-size:14px;margin-bottom:2rem}
+.field-group{margin-bottom:14px}
+.field-group label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;letter-spacing:.04em;font-weight:500}
+input[type="email"],input[type="password"],input[type="text"]{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:11px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color .15s}
+input:focus{border-color:var(--accent)}
+input::placeholder{color:var(--text3)}
+.auth-error{font-size:13px;color:var(--danger);margin-bottom:10px;min-height:20px}
 
-// ─── WIZARD ────────────────────────────────────────────────────────────────────
-window.Wizard = {
-  setWho(who, el) {
-    State.wizard.who = who;
-    document.querySelectorAll(".who-card").forEach(c => c.classList.remove("active"));
-    el.classList.add("active");
-  },
-  toggleMood(el) {
-    const mood = el.dataset.mood;
-    el.classList.toggle("active");
-    if (el.classList.contains("active")) State.wizard.moods.push(mood);
-    else State.wizard.moods = State.wizard.moods.filter(m => m !== mood);
-  },
-  updateDur(val) {
-    State.wizard.dur = +val;
-    $("dur-val").textContent = fmtDur(+val);
-  },
-  toggleChip(el, group) {
-    if (group === "epoch") {
-      document.querySelectorAll("#epoch-chips .chip").forEach(c => c.classList.remove("active"));
-      el.classList.add("active");
-      State.wizard.epoch = el.dataset.v;
-    } else {
-      el.classList.toggle("active");
-      const v = el.dataset.v;
-      if (el.classList.contains("active")) State.wizard.extras.push(v);
-      else State.wizard.extras = State.wizard.extras.filter(e => e !== v);
-    }
-  },
-  goTo(n) {
-    document.querySelectorAll(".wstep").forEach(s => s.classList.remove("active"));
-    $(`ws-${n}`).classList.add("active");
-    document.querySelectorAll(".dot").forEach((d, i) => d.classList.toggle("active", i === n - 1));
-  },
-  reset() {
-    State.wizard = { who: "solo", moods: [], dur: 150, epoch: "all", extras: [] };
-    document.querySelectorAll(".mood-card, .chip").forEach(el => el.classList.remove("active"));
-    document.querySelector(".who-card").classList.add("active");
-    document.querySelector("#epoch-chips .chip").classList.add("active");
-    $("dur-slider").value = 150;
-    $("dur-val").textContent = "2h30";
-    $("wizard-container").style.display = "block";
-    $("reco-results").style.display     = "none";
-    $("film-detail").style.display      = "none";
-    this.goTo(1);
-  },
-  async launch() {
-    $("wizard-container").style.display = "none";
-    $("reco-loading").style.display     = "block";
-    $("reco-results").style.display     = "none";
+/* BUTTONS */
+.btn-full{width:100%;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:13px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:background .15s;margin-bottom:10px}
+.btn-full:hover{background:var(--accent2)}
+.btn-full.btn-accent{background:var(--accent);color:#fff}
+.btn-text{background:none;border:none;color:var(--text2);font-size:13px;cursor:pointer;width:100%;text-align:center;padding:6px;font-family:'DM Sans',sans-serif}
+.btn-text:hover{color:var(--accent)}
+.btn-text-sm{background:none;border:none;color:var(--text2);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif}
+.btn-text-sm:hover{color:var(--accent)}
+.btn-sec{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:11px 18px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-sec:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sec-full{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:13px;color:var(--text2);font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;transition:all .15s}
+.btn-sec-full:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{background:var(--accent-dim);border:1px solid var(--accent);border-radius:8px;padding:7px 14px;color:var(--accent);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+.btn-sm:hover{background:var(--accent);color:#fff}
+.btn-ghost{background:none;border:1px solid var(--border);color:var(--text2)}
+.btn-ghost:hover{background:var(--bg3);color:var(--text);border-color:var(--border)}
+.btn-icon{background:none;border:none;color:var(--text2);cursor:pointer;padding:6px;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:all .15s}
+.btn-icon:hover{background:var(--bg3);color:var(--accent)}
+.btn-danger{width:100%;background:none;border:1px solid var(--danger);border-radius:var(--radius);padding:11px;color:var(--danger);font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;transition:background .15s}
+.btn-danger:hover{background:var(--danger);color:#fff}
 
-    const msgs = [
-      "Analyse de ton historique Letterboxd…",
-      "Croisement avec tes genres préférés…",
-      "Vérification des plateformes disponibles…",
-      "Génération des recommandations IA…"
-    ];
-    let i = 0;
-    const bar = $("loading-bar");
-    const msg = $("loading-msg");
-    bar.style.width = "0%";
-    const iv = setInterval(() => {
-      i++;
-      bar.style.width = (i / msgs.length * 100) + "%";
-      if (msgs[i]) msg.textContent = msgs[i];
-    }, 700);
+/* ONBOARDING */
+#screen-onboarding{align-items:center;justify-content:center;padding:2rem 1rem;background:radial-gradient(ellipse at top,#0d2e1a 0%,var(--bg) 60%)}
+.onboard-wrap{width:100%;max-width:480px}
+.ob-head{margin-bottom:1.5rem}
+.ob-num{font-size:12px;color:var(--accent);letter-spacing:.08em;display:block;margin-bottom:8px;font-weight:500}
+.ob-head h2{font-size:22px;font-weight:600;margin-bottom:6px}
+.ob-head p{color:var(--text2);font-size:14px}
+.platform-grid,.genre-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1.5rem}
+.plat-btn,.genre-btn{padding:8px 14px;border:1px solid var(--border);border-radius:20px;font-size:13px;cursor:pointer;color:var(--text2);background:var(--bg3);transition:all .15s;user-select:none}
+.plat-btn:hover,.genre-btn:hover{border-color:var(--accent);color:var(--accent)}
+.plat-btn.active,.genre-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
 
-    const recos = await AI.getRecos();
-    clearInterval(iv);
-    bar.style.width = "100%";
-    await new Promise(r => setTimeout(r, 300));
+/* APP */
+#screen-app{flex-direction:column;padding-bottom:64px}
+.page{display:none;padding:0 1rem;max-width:540px;margin:0 auto;width:100%}
+.page.active{display:block}
+.page-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 0;position:sticky;top:0;background:var(--bg);z-index:10;border-bottom:1px solid var(--border);margin-bottom:1.25rem}
+.logo-sm{font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--accent)}
 
-    $("reco-loading").style.display = "none";
-    $("reco-results").style.display = "block";
-    Reco.render(recos);
-  }
-};
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:64px;background:var(--bg2);border-top:1px solid var(--border);display:flex;z-index:100}
+.nav-btn{flex:1;background:none;border:none;color:var(--text3);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-family:'DM Sans',sans-serif;font-size:11px;transition:color .15s}
+.nav-btn.active{color:var(--accent)}
+.nav-btn:hover:not(.active){color:var(--text2)}
 
-// ─── AI (GROQ / LLAMA) ──────────────────────────────────────────────────────────
-window.AI = {
-  async getRecos(extra = "") {
-    const apiKey = getAPIKey();
-    if (!apiKey) {
-      toast("Ajoute ta clé API Groq dans Profil → Clé API.", "warn");
-      return AI.fallbackRecos();
-    }
+/* HERO */
+.hero{position:relative;width:100%;height:240px;border-radius:var(--radius-xl);overflow:hidden;margin-bottom:1.5rem;cursor:pointer}
+.hero-img{width:100%;height:100%;object-fit:cover;display:block}
+.hero-gradient{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.92) 0%,rgba(0,0,0,.3) 50%,transparent 100%)}
+.hero-content{position:absolute;bottom:0;left:0;right:0;padding:1.25rem}
+.hero-badge{display:inline-block;background:var(--accent);color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;margin-bottom:8px;letter-spacing:.04em}
+.hero-title{font-size:22px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px;line-height:1.2}
+.hero-meta{font-size:12px;color:rgba(255,255,255,.7);margin-bottom:12px}
+.hero-btn{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s}
+.hero-btn:hover{background:var(--accent2)}
+.hero-placeholder{width:100%;height:100%;background:linear-gradient(135deg,var(--bg3),var(--bg2));display:flex;align-items:center;justify-content:center;font-size:48px}
 
-    const w = State.wizard;
-    const p = State.profile || {};
-    const seenTitles = State.films.map(f => f.title).join(", ") || "aucun encore";
-    const topRated   = State.films.filter(f => f.rating >= 4).map(f => `${f.title} (${f.rating}★)`).slice(0, 15).join(", ") || "aucun encore";
+/* WIZARD */
+#wizard-container{padding-top:1rem}
+.wizard-body{min-height:50vh}
+.wstep{display:none;animation:fadeUp .2s ease}
+.wstep.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.wstep-title{font-size:20px;font-weight:600;margin-bottom:6px;letter-spacing:-.02em}
+.wstep-sub{font-size:13px;color:var(--text2);margin-bottom:1.25rem}
 
-    // Build dynamic ratings from Firebase
-    const allRated   = State.films.filter(f => f.rating > 0).sort((a,b) => b.rating - a.rating);
-    const loved      = allRated.filter(f => f.rating >= 4.5).map(f => `${f.title} (${f.rating}★)`).join(", ");
-    const liked      = allRated.filter(f => f.rating >= 3.5 && f.rating < 4.5).map(f => `${f.title} (${f.rating}★)`).slice(0, 30).join(", ");
-    const disliked   = allRated.filter(f => f.rating <= 2).map(f => `${f.title} (${f.rating}★)`).join(", ");
-    const allSeen    = State.films.map(f => f.title).join(", ");
+.who-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.25rem;margin-top:1.25rem}
+.who-card{border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem 1rem;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg2)}
+.who-card:hover{border-color:var(--accent)}
+.who-card.active{border-color:var(--accent);background:var(--accent-dim)}
+.who-icon{font-size:28px;margin-bottom:8px;color:var(--text3)}
+.who-card.active .who-icon{color:var(--accent)}
+.who-label{font-size:14px;font-weight:500}
 
-    // Fallback hardcoded if Firebase empty
-    const topFallback = "12 Angry Men (5★), Parasite (5★), Whiplash (5★), Taxi Driver (5★), The Godfather (5★), In the Mood for Love (5★), Good Will Hunting (4.5★), Past Lives (4.5★), The Dark Knight (4.5★), Mulholland Drive (4.5★), Se7en (4.5★), GoodFellas (4.5★), Incendies (4.5★), La La Land (4.5★)";
-    const hatesFallback = "Glass Onion (1★), Wonder Woman 1984 (1★), Fifty Shades of Grey (1★), Mean Girls (1.5★), Black Widow (1.5★)";
+.mood-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1.25rem;margin-top:1rem}
+.mood-card{border:1px solid var(--border);border-radius:var(--radius);padding:14px 8px;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg2)}
+.mood-card:hover{border-color:var(--accent)}
+.mood-card.active{border-color:var(--accent);background:var(--accent-dim)}
+.mood-icon{font-size:18px;color:var(--text3);margin-bottom:6px}
+.mood-card.active .mood-icon{color:var(--accent)}
+.mood-label{font-size:13px;font-weight:500;margin-bottom:2px}
+.mood-sub{font-size:11px;color:var(--text2)}
 
-    const prompt = `Tu es un expert en cinéma qui recommande des films à Adrien (AdrianoB23_ sur Letterboxd).
+.pref-section{margin-bottom:1.25rem}
+.pref-label{font-size:12px;color:var(--text2);letter-spacing:.04em;display:block;margin-bottom:10px;font-weight:500}
+.slider-row{display:flex;align-items:center;gap:12px}
+.slider-side{font-size:12px;color:var(--text3);white-space:nowrap}
+input[type="range"]{flex:1;-webkit-appearance:none;height:4px;background:var(--bg3);border-radius:2px;outline:none}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer}
 
-HISTORIQUE COMPLET D'ADRIEN (ses vraies notes Letterboxd) :
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:1.25rem}
+.chip{padding:6px 13px;border:1px solid var(--border);border-radius:20px;font-size:13px;color:var(--text2);background:var(--bg2);cursor:pointer;transition:all .15s;user-select:none}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
 
-Films adorés (4.5-5★) : ${loved || topFallback}
+.step-nav{display:flex;gap:10px;margin-top:1.5rem}
+.wiz-dots{display:flex;justify-content:center;gap:8px;padding:1.5rem 0 .5rem}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--border);cursor:pointer;transition:background .15s}
+.dot.active{background:var(--accent)}
 
-Films appréciés (3.5-4★) : ${liked || "non disponible"}
+/* LOADING */
+.loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:70vh;gap:1rem}
+.loading-logo{font-size:48px;color:var(--accent);animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.loading-msg{font-size:14px;color:var(--text2)}
+.loading-track{width:200px;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.loading-bar{height:100%;background:var(--accent);border-radius:2px;width:0;transition:width .6s ease}
+.loading-inline{text-align:center;padding:2rem;color:var(--text2);font-size:14px}
 
-Films détestés (≤2★, à ne JAMAIS recommander de similaires) : ${disliked || hatesFallback}
+/* RESULTS META */
+.results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+.results-title{font-size:17px;font-weight:600}
+.results-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1rem}
+.meta-tag{font-size:12px;padding:4px 10px;border-radius:20px;background:var(--bg3);border:1px solid var(--border);color:var(--text2)}
 
-PATTERNS DÉDUITS DE SES NOTES :
-- AIME : drames intenses et psychologiques, thrillers cérébraux, grands classiques (Kubrick, Scorsese, Coppola, Lynch, Kurosawa), cinéma d'auteur français (Varda, Demy, Melville), épopées ambitieuses (LOTR), biopics solides, polars, films de gangsters, westerns, films qui demandent de la réflexion
-- N'AIME PAS : MCU en général, comédies légères françaises bas de gamme, suites sans substance, films trop commerciaux sans profondeur
+/* RECO CARDS — Netflix list style */
+.reco-list{display:flex;flex-direction:column;gap:12px;margin-bottom:1rem}
+.reco-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);cursor:pointer;transition:all .2s;overflow:hidden}
+.reco-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 32px rgba(29,185,84,.15)}
+.reco-card-inner{display:flex;align-items:stretch;gap:0}
+.reco-poster{width:90px;height:130px;flex-shrink:0;position:relative;overflow:hidden}
+.reco-poster img{width:100%;height:100%;object-fit:cover;display:block}
+.reco-poster-placeholder{width:100%;height:100%;background:linear-gradient(135deg,var(--bg3),var(--bg2));display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--text3)}
+.reco-card-main{flex:1;padding:14px 14px 14px 12px;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
+.reco-title{font-size:15px;font-weight:600;margin-bottom:3px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reco-year{font-size:13px;font-weight:400;color:var(--text2)}
+.reco-meta-row{font-size:12px;color:var(--text2);display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px}
+.reco-sep{color:var(--text3)}
+.reco-platform{color:var(--accent);font-weight:500}
+.reco-hook{font-size:12px;color:var(--text2);line-height:1.4;font-style:italic;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.reco-card-right{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:14px 12px;border-left:1px solid var(--border);min-width:58px}
+.compat-score{font-size:20px;font-weight:700;color:var(--accent);line-height:1}
+.compat-pct{font-size:11px;color:var(--text3)}
+.compat-label{font-size:9px;color:var(--text3);text-align:center;line-height:1.3}
+.reco-arrow{font-size:14px;color:var(--text3);margin-top:6px}
+.results-footer{padding:.5rem 0 1.5rem}
 
-CONTEXTE CE SOIR :
-- Mode : ${w.who === "couple" ? "en couple avec sa copine" : "seul"}
-- Ambiance souhaitée : ${w.moods.length ? w.moods.join(", ") : "peu importe"}
-- Durée max : ${fmtDur(w.dur)}
-- Époque : ${w.epoch}
-- Envies particulières : ${w.extras.length ? w.extras.join(", ") : "aucune"}
-- Plateformes disponibles : ${(p.platforms || []).join(", ") || "Netflix, Prime Video, Canal+, Disney+, Apple TV+, OCS"}
-${w.who === "couple" ? "- Profil copine : aime les drames romantiques, feel-good, comédies accessibles — trouver le bon compromis pour deux" : ""}
-- Tous les films déjà vus (NE PAS recommander) : ${allSeen.length > 1000 ? allSeen.substring(0, 1000) + "..." : allSeen}
-${extra ? `- Demande spéciale : ${extra}` : ""}
+/* DETAIL */
+#film-detail{position:absolute;top:0;left:0;right:0;background:var(--bg);padding:0;max-width:540px;margin:0 auto;z-index:50;min-height:100vh}
+.detail-backdrop{width:100%;height:220px;position:relative;overflow:hidden}
+.detail-backdrop img{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(.5)}
+.detail-backdrop-gradient{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.2) 0%,var(--bg) 100%)}
+.detail-backdrop-placeholder{width:100%;height:100%;background:linear-gradient(135deg,var(--bg3),var(--bg2));display:flex;align-items:center;justify-content:center;font-size:64px}
+.detail-header-overlay{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:1rem}
+.detail-body{padding:0 1rem 2rem}
+.detail-poster-row{display:flex;gap:14px;align-items:flex-end;margin-top:-60px;margin-bottom:1rem;position:relative;z-index:2}
+.detail-poster{width:90px;height:130px;border-radius:10px;overflow:hidden;border:2px solid var(--border);flex-shrink:0;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.detail-poster img{width:100%;height:100%;object-fit:cover;display:block}
+.detail-poster-placeholder{width:100%;height:100%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:32px}
+.detail-title-block{flex:1;padding-bottom:4px}
+.detail-title{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px;color:var(--text)}
+.detail-subtitle{font-size:12px;color:var(--text2);margin-bottom:8px}
+.detail-meta-row{display:flex;flex-wrap:wrap;gap:6px}
+.badge-genre{background:var(--bg3);border:1px solid var(--border);padding:3px 9px;border-radius:20px;font-size:11px;color:var(--text2)}
+.badge-platform{background:var(--accent-dim);border:1px solid var(--accent);padding:3px 9px;border-radius:20px;font-size:11px;color:var(--accent);font-weight:500}
+.badge-rating{background:var(--bg3);border:1px solid var(--border);padding:3px 9px;border-radius:20px;font-size:11px;color:var(--text)}
+.detail-section{margin-bottom:1.5rem}
+.detail-label{font-size:11px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;font-weight:500}
+.detail-why{font-size:14px;color:var(--text);line-height:1.6;padding:12px 14px;background:var(--accent-dim);border-radius:var(--radius);border-left:3px solid var(--accent)}
+.detail-text{font-size:14px;color:var(--text2);line-height:1.7}
+.cast-row{display:flex;flex-wrap:wrap;gap:7px}
+.cast-tag{background:var(--bg3);border:1px solid var(--border);padding:5px 12px;border-radius:20px;font-size:13px;color:var(--text2)}
+.trailer-btn{display:inline-flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:11px 16px;font-size:14px;color:var(--text);text-decoration:none;transition:all .15s}
+.trailer-btn:hover{border-color:var(--accent);color:var(--accent)}
+.compat-bar-wrap{height:6px;background:var(--bg3);border-radius:4px;overflow:hidden;margin-bottom:6px}
+.compat-bar-fill{height:100%;background:var(--accent);border-radius:4px;transition:width 1s ease}
+.compat-bar-label{font-size:12px;color:var(--text2)}
 
-RÈGLES ABSOLUES :
-1. Ne JAMAIS recommander un film déjà vu par Adrien
-2. Toujours justifier en citant un film qu'il a aimé ("Comme tu as adoré Whiplash..." ou "Dans la lignée de Parasite...")
-3. Jamais de MCU sauf demande explicite
-4. En mode couple : équilibrer ses goûts pointus avec quelque chose d'accessible pour deux
-5. Le score de compatibilité doit refléter réellement ses goûts (pas juste mettre 90+ partout)
+/* FILMS PAGE */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center}
+.stat-n{font-size:22px;font-weight:600;color:var(--accent)}
+.stat-l{font-size:11px;color:var(--text3);margin-top:2px}
+.search-bar{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;margin-bottom:10px;color:var(--text3)}
+.search-bar:focus-within{border-color:var(--accent)}
+.search-bar input{flex:1;background:none;border:none;padding:10px 4px;font-size:14px;color:var(--text)}
+.search-bar input:focus{outline:none}
+.import-zone{display:flex;align-items:center;gap:12px;background:var(--accent-dim);border:1px dashed var(--accent);border-radius:var(--radius);padding:14px;margin-bottom:10px;cursor:pointer;transition:all .15s;color:var(--accent)}
+.import-zone:hover{background:#0d3d21cc}
+.import-title{font-size:13px;font-weight:500;color:var(--accent)}
+.import-sub{font-size:11px;color:var(--text2);margin-top:2px}
+#import-status{font-size:12px;color:var(--accent);margin-left:auto;font-weight:500}
+.add-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:10px}
+.add-input{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;transition:border-color .15s}
+.add-input:focus{border-color:var(--accent)}
+.star-input{display:flex;gap:4px}
+.star-btn{font-size:18px;cursor:pointer;color:var(--border);transition:color .1s;line-height:1}
+.star-btn.lit{color:var(--accent)}
+.film-list{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.film-row{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border);transition:background .1s}
+.film-row:last-child{border-bottom:none}
+.film-row:hover{background:var(--bg3)}
+.film-info{flex:1;min-width:0}
+.film-title{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.film-year{font-size:12px;color:var(--text3)}
+.film-row-right{display:flex;align-items:center;gap:10px}
+.film-stars{font-size:13px;color:var(--accent);letter-spacing:1px}
+.del-btn{background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:2px 4px}
+.del-btn:hover{color:var(--danger)}
+.empty-state{font-size:14px;color:var(--text3);text-align:center;padding:2.5rem 1rem;line-height:1.8}
 
-Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau de 3 objets :
-[
-  {
-    "title": "Titre exact du film",
-    "year": 2019,
-    "duration": 125,
-    "genre": "Thriller, Drame",
-    "platform": "Netflix",
-    "hook": "Une phrase d'accroche percutante de 15 mots max",
-    "why": "Explication personnalisée en 2-3 phrases basée sur les goûts de l'utilisateur",
-    "synopsis": "Synopsis complet de 4-5 phrases",
-    "director": "Réalisateur",
-    "cast": ["Acteur 1", "Acteur 2", "Acteur 3"],
-    "trailerQuery": "Titre film année trailer youtube",
-    "rating": 4.2,
-    "compatScore": 92
-  }
-]`;
+/* SETTINGS */
+.settings-section{margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border)}
+.settings-title{font-size:14px;font-weight:500;margin-bottom:12px;color:var(--text)}
 
-    try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          temperature: 0.8,
-          max_tokens: 2000,
-          messages: [
-            {
-              role: "system",
-              content: "Tu es un expert en cinéma. Tu réponds UNIQUEMENT avec du JSON valide, sans markdown, sans backticks, sans texte avant ou après."
-            },
-            {
-              role: "user",
-              content: prompt
-            }
-          ]
-        })
-      });
-      const data = await res.json();
-      if (data.error) {
-        console.error("Groq error:", JSON.stringify(data.error));
-        throw new Error(data.error.message);
-      }
-      let text = data.choices[0].message.content.trim();
-      text = text.replace(/```json|```/g, "").trim();
-      if (text.startsWith("{")) text = "[" + text + "]";
-      return JSON.parse(text);
-    } catch (e) {
-      console.error("Groq API error:", e);
-      toast("Erreur API — affichage de suggestions par défaut.", "warn");
-      return AI.fallbackRecos();
-    }
-  },
+/* TOAST */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--accent);border-radius:var(--radius);padding:10px 18px;font-size:13px;color:var(--text);z-index:1000;white-space:nowrap;animation:toastIn .2s ease;box-shadow:0 4px 20px rgba(29,185,84,.2)}
+.toast-warn{border-color:var(--danger);color:var(--danger)}
+@keyframes toastIn{from{opacity:0;bottom:60px}to{opacity:1;bottom:80px}}
 
-  fallbackRecos() {
-    return [
-      { title: "Prisoners", year: 2013, duration: 153, genre: "Thriller, Drame", platform: "Netflix",
-        hook: "Deux fillettes disparaissent. Un père prêt à tout.", why: "Denis Villeneuve au sommet de son art.",
-        synopsis: "Keller Dover est confronté à l'enlèvement de sa fille...", director: "Denis Villeneuve",
-        cast: ["Hugh Jackman", "Jake Gyllenhaal"], trailerQuery: "Prisoners 2013 trailer", rating: 4.5, compatScore: 94 },
-      { title: "Knives Out", year: 2019, duration: 130, genre: "Thriller, Comédie", platform: "Netflix",
-        hook: "Un meurtre parfait. Un détective imparfait.", why: "Whodunit moderne, accessible et brillant.",
-        synopsis: "La mort du patriarche Harlan Thrombey...", director: "Rian Johnson",
-        cast: ["Daniel Craig", "Ana de Armas"], trailerQuery: "Knives Out 2019 trailer", rating: 4.3, compatScore: 88 },
-      { title: "The Grand Budapest Hotel", year: 2014, duration: 99, genre: "Comédie, Aventure", platform: "Disney+",
-        hook: "L'hôtel le plus élégant des Alpes. Le portier le plus excentrique d'Europe.", why: "Wes Anderson à son meilleur.",
-        synopsis: "Le concierge légendaire d'un grand hôtel...", director: "Wes Anderson",
-        cast: ["Ralph Fiennes", "Tony Revolori"], trailerQuery: "Grand Budapest Hotel trailer", rating: 4.2, compatScore: 85 }
-    ];
-  },
-
-  async moreRecos() {
-    $("reco-list").innerHTML = `<div class="loading-inline">Génération de nouvelles suggestions…</div>`;
-    const recos = await AI.getRecos("Propose des films différents des précédents.");
-    Reco.render(recos);
-  }
-};
-
-// ─── RECO RENDER ───────────────────────────────────────────────────────────────
-window.Reco = {
-  current: [],
-  render(recos) {
-    Reco.current = recos;
-    const w = State.wizard;
-    $("results-meta").innerHTML =
-      `<span class="meta-tag">${w.who === "couple" ? "En couple" : "Solo"}</span>` +
-      (w.moods.length ? w.moods.map(m => `<span class="meta-tag">${m}</span>`).join("") : "") +
-      `<span class="meta-tag">Max ${fmtDur(w.dur)}</span>`;
-
-    $("reco-list").innerHTML = recos.map((f, i) => `
-      <div class="reco-card" onclick="Detail.open(${i})">
-        <div class="reco-card-inner">
-          <div class="reco-card-main">
-            <div class="reco-title">${f.title} <span class="reco-year">${f.year}</span></div>
-            <div class="reco-meta">
-              <span class="reco-genre">${f.genre}</span>
-              <span class="reco-sep">·</span>
-              <span>${fmtDur(f.duration)}</span>
-              <span class="reco-sep">·</span>
-              <span class="reco-platform">${f.platform}</span>
-            </div>
-            <div class="reco-hook">${f.hook}</div>
-          </div>
-          <div class="reco-card-right">
-            <div class="compat-score">${f.compatScore}<span class="compat-pct">%</span></div>
-            <div class="compat-label">compatibilité</div>
-            <div class="reco-arrow">→</div>
-          </div>
-        </div>
-      </div>`).join("");
-  }
-};
-
-// ─── DETAIL ────────────────────────────────────────────────────────────────────
-window.Detail = {
-  open(i) {
-    const f = Reco.current[i];
-    if (!f) return;
-    const trailerUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(f.trailerQuery)}`;
-    $("detail-content").innerHTML = `
-      <div class="detail-hero">
-        <div class="detail-title">${f.title}</div>
-        <div class="detail-subtitle">${f.year} · ${fmtDur(f.duration)} · ${f.director || ""}</div>
-        <div class="detail-meta-row">
-          <span class="badge-genre">${f.genre}</span>
-          <span class="badge-platform">${f.platform}</span>
-          <span class="badge-rating">★ ${f.rating?.toFixed(1) || "—"}</span>
-        </div>
-      </div>
-
-      <div class="detail-section">
-        <div class="detail-label">Pourquoi ce film pour toi</div>
-        <p class="detail-why">${f.why}</p>
-      </div>
-
-      <div class="detail-section">
-        <div class="detail-label">Synopsis</div>
-        <p class="detail-text">${f.synopsis}</p>
-      </div>
-
-      ${f.cast?.length ? `
-      <div class="detail-section">
-        <div class="detail-label">Avec</div>
-        <div class="cast-row">${f.cast.map(a => `<span class="cast-tag">${a}</span>`).join("")}</div>
-      </div>` : ""}
-
-      <div class="detail-section">
-        <div class="detail-label">Bande-annonce</div>
-        <a href="${trailerUrl}" target="_blank" class="trailer-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Voir la bande-annonce sur YouTube
-        </a>
-      </div>
-
-      <div class="detail-section">
-        <div class="detail-label">Compatibilité</div>
-        <div class="compat-bar-wrap">
-          <div class="compat-bar-fill" style="width:${f.compatScore}%"></div>
-        </div>
-        <div class="compat-bar-label">${f.compatScore}% avec ton profil${State.wizard.who === "couple" ? " (et celui de ta copine)" : ""}</div>
-      </div>
-
-      <button class="btn-full btn-accent" style="margin-top:1.5rem" onclick="Films.markWatched('${f.title.replace(/'/g,"\\'")}', ${f.year})">
-        ✓ Marquer comme vu
-      </button>
-    `;
-    $("film-detail").style.display  = "block";
-    $("reco-results").style.display = "none";
-    $("detail-content").scrollTop = 0;
-    window.scrollTo(0, 0);
-  },
-  close() {
-    $("film-detail").style.display  = "none";
-    $("reco-results").style.display = "block";
-  }
-};
-
-// ─── FILMS ─────────────────────────────────────────────────────────────────────
-window.Films = {
-  async load() {
-    if (!State.user) return;
-    State.films = await fbGetFilms(State.user.uid);
-    Films.render();
-    Films.updateStats();
-  },
-
-  filter(q) {
-    const filtered = State.films.filter(f => f.title.toLowerCase().includes(q.toLowerCase()));
-    Films.renderList(filtered);
-  },
-
-  render() {
-    Films.renderList(State.films);
-    Films.updateStats();
-  },
-
-  renderList(list) {
-    const el = $("film-list");
-    if (!list.length) {
-      el.innerHTML = `<p class="empty-state">Aucun film enregistré.<br>Importe ton CSV Letterboxd ou ajoute manuellement.</p>`;
-      return;
-    }
-    el.innerHTML = list.map(f => `
-      <div class="film-row">
-        <div class="film-info">
-          <div class="film-title">${f.title}</div>
-          <div class="film-year">${f.year || ""}</div>
-        </div>
-        <div class="film-row-right">
-          <div class="film-stars">${starsHtml(f.rating || 0)}</div>
-          <button class="del-btn" onclick="Films.remove('${f.id}')" aria-label="Supprimer">✕</button>
-        </div>
-      </div>`).join("");
-  },
-
-  updateStats() {
-    $("stat-total").textContent = State.films.length;
-    const rated = State.films.filter(f => f.rating > 0);
-    const avg   = rated.length ? rated.reduce((s, f) => s + f.rating, 0) / rated.length : 0;
-    $("stat-avg").textContent = avg ? avg.toFixed(1) + "★" : "—";
-    $("stat-fav").textContent = State.films.filter(f => f.rating >= 4).length;
-  },
-
-  showAddForm()  { $("add-form").style.display = "flex"; $("new-title").focus(); },
-  hideAddForm()  { $("add-form").style.display = "none"; State.addStar = 0; Films.clearStars(); },
-
-  setStar(n) {
-    State.addStar = n;
-    document.querySelectorAll(".star-btn").forEach((b, i) => b.classList.toggle("lit", i < n));
-  },
-  clearStars() {
-    document.querySelectorAll(".star-btn").forEach(b => b.classList.remove("lit"));
-  },
-
-  async add() {
-    const title = $("new-title").value.trim();
-    const year  = $("new-year").value.trim();
-    if (!title) return;
-    const id = await fbAddFilm(State.user.uid, { title, year, rating: State.addStar });
-    State.films.unshift({ id, title, year, rating: State.addStar });
-    Films.render();
-    $("new-title").value = "";
-    $("new-year").value  = "";
-    Films.hideAddForm();
-    toast("Film ajouté !");
-  },
-
-  async markWatched(title, year) {
-    if (State.films.find(f => f.title.toLowerCase() === title.toLowerCase())) {
-      toast("Déjà dans ta liste !", "warn");
-      return;
-    }
-    const id = await fbAddFilm(State.user.uid, { title, year: String(year), rating: 0 });
-    State.films.unshift({ id, title, year: String(year), rating: 0 });
-    Films.updateStats();
-    toast(`"${title}" ajouté à ta liste. Pense à lui mettre une note !`);
-    Detail.close();
-  },
-
-  async remove(id) {
-    await fbDeleteFilm(State.user.uid, id);
-    State.films = State.films.filter(f => f.id !== id);
-    Films.render();
-    toast("Film supprimé.");
-  },
-
-  importCSV(input) {
-    const file = input.files[0];
-    if (!file) return;
-    $("import-status").textContent = "Import en cours…";
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const lines  = e.target.result.split("\n");
-      const header = lines[0].toLowerCase().split(",");
-      const nameIdx   = header.findIndex(h => h.trim().includes("name"));
-      const yearIdx   = header.findIndex(h => h.trim().includes("year"));
-      const ratingIdx = header.findIndex(h => h.trim() === "rating");
-
-      const toAdd = [];
-      for (let i = 1; i < lines.length; i++) {
-        const cols  = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
-        const clean = cols.map(c => c.replace(/^"|"$/g, "").trim());
-        const title = clean[nameIdx];
-        if (!title) continue;
-        if (State.films.find(f => f.title.toLowerCase() === title.toLowerCase())) continue;
-        const year   = clean[yearIdx] || "";
-        // ratings.csv uses 0.5-5 scale, watched.csv has no rating
-        const raw    = ratingIdx >= 0 ? parseFloat(clean[ratingIdx]) : 0;
-        const rating = isNaN(raw) ? 0 : raw; // keep decimal (e.g. 4.5)
-        toAdd.push({ title, year, rating });
-      }
-
-      if (!toAdd.length) { $("import-status").textContent = "Aucun nouveau film trouvé."; return; }
-      await fbBulkAddFilms(State.user.uid, toAdd);
-      State.films = await fbGetFilms(State.user.uid);
-      Films.render();
-      $("import-status").textContent = `✓ ${toAdd.length} films importés avec notes !`;
-      setTimeout(() => $("import-status").textContent = "", 4000);
-      toast(`${toAdd.length} films importés depuis Letterboxd !`);
-    };
-    reader.readAsText(file);
-  }
-};
-
-// ─── SETTINGS ──────────────────────────────────────────────────────────────────
-window.Settings = {
-  syncUI() {
-    const p = State.profile || {};
-    // Plateformes
-    document.querySelectorAll("#settings-platforms .plat-btn").forEach(btn => {
-      btn.classList.toggle("active", (p.platforms || []).includes(btn.dataset.p));
-    });
-    // Genres
-    document.querySelectorAll("#settings-genres .genre-btn").forEach(btn => {
-      btn.classList.toggle("active", (p.genres || []).includes(btn.dataset.g));
-    });
-    // GF
-    document.querySelectorAll("#settings-gf .genre-btn").forEach(btn => {
-      btn.classList.toggle("active", (p.gfGenres || []).includes(btn.dataset.g));
-    });
-    // Email
-    $("user-email-display").textContent = State.user?.email || "";
-    // API key
-    $("api-key-input").value = getAPIKey() ? "••••••••••••••••" : "";
-  },
-
-  async savePlatforms() {
-    const platforms = [...document.querySelectorAll("#settings-platforms .plat-btn.active")].map(b => b.dataset.p);
-    await fbSaveProfile(State.user.uid, { platforms });
-    State.profile.platforms = platforms;
-    toast("Plateformes sauvegardées !");
-  },
-
-  async saveGenres() {
-    const genres = [...document.querySelectorAll("#settings-genres .genre-btn.active")].map(b => b.dataset.g);
-    await fbSaveProfile(State.user.uid, { genres });
-    State.profile.genres = genres;
-    toast("Genres sauvegardés !");
-  },
-
-  async saveGF() {
-    const gfGenres = [...document.querySelectorAll("#settings-gf .genre-btn.active")].map(b => b.dataset.g);
-    await fbSaveProfile(State.user.uid, { gfGenres });
-    State.profile.gfGenres = gfGenres;
-    toast("Profil de ta copine sauvegardé !");
-  },
-
-  saveAPIKey() {
-    const val = $("api-key-input").value.trim();
-    if (val && !val.startsWith("•")) {
-      localStorage.setItem("cinescope_apikey", val);
-      toast("Clé API sauvegardée !");
-      $("api-key-input").value = "••••••••••••••••";
-    }
-  }
-};
-
-// ─── BOOT ──────────────────────────────────────────────────────────────────────
-fbOnAuth(async (user) => {
-  if (!user) {
-    showScreen("auth");
-    return;
-  }
-  State.user    = user;
-  State.profile = await fbGetProfile(user.uid);
-
-  if (!State.profile?.onboarded) {
-    showScreen("onboarding");
-    return;
-  }
-
-  await Films.load();
-  Settings.syncUI();
-  showScreen("app");
-  Nav.goto("reco");
-});
+@media(min-width:600px){
+  #page-reco,#page-films,#page-settings{padding:0 1.5rem}
+}
