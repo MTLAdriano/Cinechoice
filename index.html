@@ -174,6 +174,10 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
         <span>À voir</span>
       </button>
+      <button class="nav-btn" data-page="news" onclick="Nav.goto('news', this)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v12H4z"/><path d="M8 20h8"/><path d="M12 16v4"/><path d="M8 8h8"/><path d="M8 12h5"/></svg>
+        <span>Sorties</span>
+      </button>
       <button class="nav-btn" data-page="alice" onclick="Nav.goto('alice', this)">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         <span>Alice</span>
@@ -457,6 +461,22 @@
       </div>
 
       <div id="alice-film-list" class="film-list"></div>
+    </div>
+
+    <!-- NEWS PAGE -->
+    <div id="page-news" class="page">
+      <header class="page-header">
+        <span class="logo-sm">◈ Sorties</span>
+        <div style="display:flex;gap:6px" id="news-platform-filters"></div>
+      </header>
+      <div class="news-filter-row" id="news-filters">
+        <button class="news-filter active" data-type="all" onclick="News.filter('all', this)">Tout</button>
+        <button class="news-filter" data-type="movie" onclick="News.filter('movie', this)">Films</button>
+        <button class="news-filter" data-type="tv" onclick="News.filter('tv', this)">Séries</button>
+      </div>
+      <div id="news-grid" class="news-grid">
+        <div class="loading-inline">Chargement des sorties…</div>
+      </div>
     </div>
 
     <!-- SETTINGS PAGE -->
