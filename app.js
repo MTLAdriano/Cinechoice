@@ -317,6 +317,8 @@ RÈGLES ABSOLUES :
 3. Jamais de MCU sauf demande explicite
 4. En mode couple : équilibrer ses goûts pointus avec quelque chose d'accessible pour deux
 5. Le score de compatibilité doit refléter réellement ses goûts (pas juste mettre 90+ partout)
+6. PRIME VIDEO : uniquement les films inclus dans l'abonnement Prime de base (pas location/achat). En cas de doute, indiquer Netflix ou Canal+ à la place.
+7. Ne JAMAIS recommander un film présent dans la liste des films déjà vus
 
 Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau de 3 objets :
 [
