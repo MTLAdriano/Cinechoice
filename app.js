@@ -1198,157 +1198,266 @@ window.Alice = {
 };
 
 // ─── NEWS ─────────────────────────────────────────────────────────────────────
-// TMDB provider IDs for streaming platforms
 const PLATFORM_PROVIDERS = {
-  "Netflix":     { id: 8,   name: "Netflix" },
-  "Prime Video": { id: 9,   name: "Prime Video" },
-  "Canal+":      { id: 35,  name: "Canal+" },
-  "Disney+":     { id: 337, name: "Disney+" },
-  "Apple TV+":   { id: 350, name: "Apple TV+" },
-  "OCS":         { id: 56,  name: "OCS" },
-  "Mubi":        { id: 100, name: "Mubi" }
+  "Netflix":     8,
+  "Prime Video": 9,
+  "Canal+":      35,
+  "Disney+":     337,
+  "Apple TV+":   350,
+  "OCS":         56,
+  "Mubi":        100
 };
 
 window.News = {
   _allItems: [],
-  _type: "all",
   _loaded: false,
+  _filters: { type: "all", days: 60, rating: 0, platform: "all" },
 
   async load() {
+    News._buildPlatformBtns();
     if (News._loaded) { News.render(); return; }
+    await News._fetch();
+  },
+
+  async reload() {
+    News._loaded = false;
+    News._allItems = [];
+    $("news-grid").innerHTML = '<div class="loading-inline">Chargement…</div>';
+    await News._fetch();
+  },
+
+  _buildPlatformBtns() {
+    const el = $("news-platform-btns");
+    if (!el || el.children.length > 0) return;
+    const platforms = (State.profile && State.profile.platforms) || [];
+    // "Tout" button
+    const allBtn = document.createElement("button");
+    allBtn.className = "news-adv-btn active";
+    allBtn.textContent = "Tout";
+    allBtn.addEventListener("click", () => {
+      News._filters.platform = "all";
+      document.querySelectorAll("#news-platform-btns .news-adv-btn").forEach(b => b.classList.remove("active"));
+      allBtn.classList.add("active");
+      News.render();
+    });
+    el.appendChild(allBtn);
+    platforms.forEach(p => {
+      const btn = document.createElement("button");
+      btn.className = "news-adv-btn";
+      btn.textContent = p;
+      btn.addEventListener("click", () => {
+        News._filters.platform = p;
+        document.querySelectorAll("#news-platform-btns .news-adv-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        News.render();
+      });
+      el.appendChild(btn);
+    });
+  },
+
+  setFilter(key, val, btn) {
+    News._filters[key] = val;
+    // Update active state for this filter group
+    if (btn) {
+      const row = btn.parentNode;
+      row.querySelectorAll(".news-filter, .news-adv-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+    }
+    // Refetch if days changed
+    if (key === "days") {
+      News._loaded = false;
+      News._allItems = [];
+      News._fetch();
+    } else {
+      News.render();
+    }
+  },
+
+  async _fetch() {
     const key = getTMDBKey();
     if (!key) {
-      $("news-grid").innerHTML = '<p class="empty-state">Configure ta clé TMDB dans Profil pour voir les sorties.</p>';
+      $("news-grid").innerHTML = '<p class="empty-state">Configure ta clé TMDB dans Profil.</p>';
       return;
     }
-
     const platforms = (State.profile && State.profile.platforms) || [];
-    const providerIds = platforms
-      .map(p => PLATFORM_PROVIDERS[p])
-      .filter(Boolean)
-      .map(p => p.id)
-      .join("|");
-
+    const providerIds = platforms.map(p => PLATFORM_PROVIDERS[p]).filter(Boolean).join("|");
     if (!providerIds) {
       $("news-grid").innerHTML = '<p class="empty-state">Configure tes plateformes dans Profil.</p>';
       return;
     }
-
     $("news-grid").innerHTML = '<div class="loading-inline">Chargement des sorties…</div>';
 
+    const days = News._filters.days || 60;
+    const today = new Date().toISOString().split("T")[0];
+    const from  = new Date(Date.now() - days*24*60*60*1000).toISOString().split("T")[0];
+
     try {
-      // Fetch recent movies on user's platforms (France region)
       const [moviesRes, tvRes] = await Promise.all([
         fetch("https://api.themoviedb.org/3/discover/movie?api_key=" + key +
           "&language=fr-FR&region=FR&sort_by=release_date.desc" +
-          "&release_date.lte=" + new Date().toISOString().split("T")[0] +
-          "&release_date.gte=" + new Date(Date.now() - 60*24*60*60*1000).toISOString().split("T")[0] +
-          "&with_watch_providers=" + providerIds +
-          "&watch_region=FR&vote_count.gte=10&page=1"),
+          "&release_date.lte=" + today + "&release_date.gte=" + from +
+          "&with_watch_providers=" + providerIds + "&watch_region=FR&vote_count.gte=5"),
         fetch("https://api.themoviedb.org/3/discover/tv?api_key=" + key +
           "&language=fr-FR&sort_by=first_air_date.desc" +
-          "&first_air_date.lte=" + new Date().toISOString().split("T")[0] +
-          "&first_air_date.gte=" + new Date(Date.now() - 60*24*60*60*1000).toISOString().split("T")[0] +
-          "&with_watch_providers=" + providerIds +
-          "&watch_region=FR&vote_count.gte=10&page=1")
+          "&first_air_date.lte=" + today + "&first_air_date.gte=" + from +
+          "&with_watch_providers=" + providerIds + "&watch_region=FR&vote_count.gte=5")
       ]);
-
       const [movies, tv] = await Promise.all([moviesRes.json(), tvRes.json()]);
 
-      const movieItems = (movies.results || []).map(m => ({
-        id: m.id, type: "movie",
+      const toItem = (m, type) => ({
+        id: m.id, type,
         title: m.title || m.name,
-        date: m.release_date,
+        date: m.release_date || m.first_air_date,
         poster: m.poster_path ? "https://image.tmdb.org/t/p/w342" + m.poster_path : null,
-        backdrop: m.backdrop_path ? "https://image.tmdb.org/t/p/w500" + m.backdrop_path : null,
-        rating: m.vote_average ? m.vote_average.toFixed(1) : "—",
-        overview: m.overview
-      }));
+        backdrop: m.backdrop_path ? "https://image.tmdb.org/t/p/w780" + m.backdrop_path : null,
+        rating: m.vote_average || 0,
+        ratingStr: m.vote_average ? m.vote_average.toFixed(1) : "—",
+        overview: m.overview || "",
+        genres: m.genre_ids || []
+      });
 
-      const tvItems = (tv.results || []).map(s => ({
-        id: s.id, type: "tv",
-        title: s.name || s.title,
-        date: s.first_air_date,
-        poster: s.poster_path ? "https://image.tmdb.org/t/p/w342" + s.poster_path : null,
-        backdrop: s.backdrop_path ? "https://image.tmdb.org/t/p/w500" + s.backdrop_path : null,
-        rating: s.vote_average ? s.vote_average.toFixed(1) : "—",
-        overview: s.overview
-      }));
+      News._allItems = [
+        ...(movies.results||[]).map(m => toItem(m,"movie")),
+        ...(tv.results||[]).map(s => toItem(s,"tv"))
+      ].sort((a,b) => new Date(b.date) - new Date(a.date));
 
-      News._allItems = [...movieItems, ...tvItems]
-        .sort((a, b) => new Date(b.date) - new Date(a.date));
+      // Fetch provider info for each item to know which platform
+      await News._fetchProviders(key, providerIds);
+
       News._loaded = true;
       News.render();
     } catch(e) {
       console.error("News error:", e);
-      $("news-grid").innerHTML = '<p class="empty-state">Erreur de chargement. Réessaie.</p>';
+      $("news-grid").innerHTML = '<p class="empty-state">Erreur. Réessaie.</p>';
     }
   },
 
-  filter(type, btn) {
-    News._type = type;
-    document.querySelectorAll(".news-filter").forEach(b => b.classList.remove("active"));
-    if (btn) btn.classList.add("active");
-    News.render();
+  async _fetchProviders(key, providerIds) {
+    // Fetch provider for first 10 items to label them
+    const first10 = News._allItems.slice(0, 20);
+    await Promise.all(first10.map(async item => {
+      try {
+        const endpoint = item.type === "movie" ? "movie" : "tv";
+        const res = await fetch("https://api.themoviedb.org/3/" + endpoint + "/" + item.id + "/watch/providers?api_key=" + key);
+        const data = await res.json();
+        const fr = data.results && data.results.FR;
+        if (fr && fr.flatrate && fr.flatrate.length > 0) {
+          const pid = fr.flatrate[0].provider_id;
+          const found = Object.entries(PLATFORM_PROVIDERS).find(([,id]) => id === pid);
+          item.platform = found ? found[0] : fr.flatrate[0].provider_name;
+        }
+      } catch(e) {}
+    }));
   },
 
   render() {
     const grid = $("news-grid");
     if (!grid) return;
-    const items = News._type === "all" ? News._allItems
-      : News._allItems.filter(i => i.type === News._type);
+    const f = News._filters;
+
+    let items = News._allItems.filter(item => {
+      if (f.type !== "all" && item.type !== f.type) return false;
+      if (f.rating > 0 && item.rating < f.rating) return false;
+      if (f.platform !== "all" && item.platform !== f.platform) return false;
+      return true;
+    });
+
+    const countEl = $("news-count");
+    if (countEl) countEl.textContent = items.length + " résultat" + (items.length > 1 ? "s" : "");
 
     if (!items.length) {
-      grid.innerHTML = '<p class="empty-state">Aucune sortie récente trouvée.<br>Essaie de changer le filtre.</p>';
+      grid.innerHTML = '<p class="empty-state">Aucune sortie avec ces filtres.</p>';
       return;
     }
 
     grid.innerHTML = "";
     items.forEach(item => {
+      const alreadySeen = State.films.find(f => f.title.toLowerCase() === item.title.toLowerCase());
       const card = document.createElement("div");
       card.className = "news-card";
-
-      const alreadySeen = State.films.find(f =>
-        f.title.toLowerCase() === item.title.toLowerCase()
-      );
+      card.style.cursor = "pointer";
 
       card.innerHTML =
         '<div class="news-poster">' +
-          (item.poster
-            ? '<img src="' + item.poster + '" alt="' + item.title + '" style="width:100%;height:100%;object-fit:cover;display:block">'
-            : '<div class="news-poster-placeholder">🎬</div>') +
+          (item.poster ? '<img src="' + item.poster + '" alt="' + item.title + '" style="width:100%;height:100%;object-fit:cover;display:block">' : '<div class="news-poster-placeholder">🎬</div>') +
           (alreadySeen ? '<div class="news-seen-badge">✓ Vu</div>' : '') +
         '</div>' +
         '<div class="news-info">' +
-          '<div class="news-type-badge">' + (item.type === "movie" ? "Film" : "Série") + '</div>' +
+          '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">' +
+            '<div class="news-type-badge">' + (item.type === "movie" ? "Film" : "Série") + '</div>' +
+            (item.platform ? '<div class="news-type-badge" style="background:var(--accent-light);color:var(--accent)">' + item.platform + '</div>' : '') +
+          '</div>' +
           '<div class="news-title">' + item.title + '</div>' +
           '<div class="news-meta">' +
-            '<span>★ ' + item.rating + '</span>' +
+            '<span>★ ' + item.ratingStr + '</span>' +
             '<span class="reco-sep">·</span>' +
-            '<span>' + (item.date ? new Date(item.date).toLocaleDateString("fr-FR", {month:"short", day:"numeric"}) : "") + '</span>' +
+            '<span>' + (item.date ? new Date(item.date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}) : "") + '</span>' +
           '</div>' +
-          '<div class="news-overview">' + (item.overview || "") + '</div>' +
+          '<div class="news-overview">' + item.overview + '</div>' +
         '</div>' +
-        '<button class="news-save-btn" onclick="News.addToWatchlist(' + item.id + ')" title="Ajouter à ma liste">🔖</button>';
+        '<button class="news-save-btn" title="Ajouter à ma liste">🔖</button>';
 
-      // Store item data for watchlist
-      card.dataset.itemId = item.id;
-      News._itemMap = News._itemMap || {};
-      News._itemMap[item.id] = item;
+      // Click card → detail
+      card.querySelector(".news-info").addEventListener("click", () => News.openDetail(item));
+      card.querySelector(".news-poster").addEventListener("click", () => News.openDetail(item));
+      // Save btn
+      card.querySelector(".news-save-btn").addEventListener("click", e => {
+        e.stopPropagation();
+        Watchlist.add({ title: item.title, year: item.date ? item.date.substring(0,4) : "", genre: item.type === "movie" ? "Film" : "Série", platform: item.platform || "" });
+        e.target.textContent = "✓";
+        e.target.style.opacity = "1";
+      });
 
       grid.appendChild(card);
     });
   },
 
-  addToWatchlist(id) {
-    const item = (News._itemMap || {})[id];
-    if (!item) return;
-    Watchlist.add({
-      title: item.title,
-      year: item.date ? item.date.substring(0, 4) : "",
-      genre: item.type === "movie" ? "Film" : "Série",
-      platform: ""
-    });
+  openDetail(item) {
+    const trailerUrl = "https://www.youtube.com/results?search_query=" + encodeURIComponent(item.title + " trailer");
+    $("news-detail-content").innerHTML =
+      '<div class="detail-backdrop">' +
+        (item.backdrop ? '<img src="' + item.backdrop + '" style="width:100%;height:100%;object-fit:cover;display:block">' : '<div class="detail-backdrop-placeholder">🎬</div>') +
+        '<div class="detail-backdrop-gradient"></div>' +
+      '</div>' +
+      '<div class="detail-body">' +
+        '<div class="detail-poster-row">' +
+          '<div class="detail-poster">' +
+            (item.poster ? '<img src="' + item.poster + '" style="width:100%;height:100%;object-fit:cover;display:block">' : '<div class="detail-poster-placeholder">🎬</div>') +
+          '</div>' +
+          '<div class="detail-title-block">' +
+            '<div class="detail-title">' + item.title + '</div>' +
+            '<div class="detail-subtitle">' + (item.date ? new Date(item.date).toLocaleDateString("fr-FR",{year:"numeric",month:"long",day:"numeric"}) : "") + '</div>' +
+            '<div class="detail-meta-row">' +
+              '<span class="badge-genre">' + (item.type === "movie" ? "Film" : "Série") + '</span>' +
+              (item.platform ? '<span class="badge-platform">' + item.platform + '</span>' : '') +
+              '<span class="badge-rating">★ ' + item.ratingStr + '</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="detail-section">' +
+          '<div class="detail-label">Synopsis</div>' +
+          '<p class="detail-text">' + (item.overview || "Synopsis non disponible.") + '</p>' +
+        '</div>' +
+        '<div class="detail-section">' +
+          '<div class="detail-label">Bande-annonce</div>' +
+          '<a href="' + trailerUrl + '" target="_blank" class="trailer-btn">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Voir sur YouTube' +
+          '</a>' +
+        '</div>' +
+        '<div style="display:flex;gap:10px;margin-top:1rem">' +
+          '<button class="btn-full btn-accent" onclick="Watchlist.add({title:'' + item.title.replace(/'/g,"\'") + '',year:'' + (item.date||"").substring(0,4) + '',genre:'' + (item.type==="movie"?"Film":"Série") + '',platform:'' + (item.platform||"") + ''});toast('Ajouté à ta liste !')">🔖 À voir</button>' +
+          '<button class="btn-sec" style="flex:1" onclick="Films.markWatched('' + item.title.replace(/'/g,"\'") + '','' + (item.date||"").substring(0,4) + '',0)">✓ Déjà vu</button>' +
+        '</div>' +
+      '</div>';
+
+    $("news-detail").style.display = "block";
+    $("news-grid").parentElement.querySelectorAll(":scope > *:not(#news-detail)").forEach(el => el.style.display = "none");
+    window.scrollTo(0,0);
+  },
+
+  closeDetail() {
+    $("news-detail").style.display = "none";
+    $("news-grid").parentElement.querySelectorAll(":scope > *:not(#news-detail)").forEach(el => el.style.display = "");
   }
 };
 
