@@ -492,9 +492,18 @@ window.Detail = {
     $("detail-content").scrollTop = 0;
     window.scrollTo(0, 0);
   },
+  markStarVal: 0,
+  setMarkStar(n, el) {
+    Detail.markStarVal = n;
+    const stars = document.querySelectorAll("#mark-stars .star-btn");
+    stars.forEach((s, i) => s.classList.toggle("lit", i < n));
+  },
   close() {
+    Detail.markStarVal = 0;
     $("film-detail").style.display  = "none";
     $("reco-results").style.display = "block";
+    const hs = $("hero-section");
+    if (hs && hs.style.display !== "none") hs.style.display = "block";
   }
 };
 
@@ -568,15 +577,16 @@ window.Films = {
     toast("Film ajouté !");
   },
 
-  async markWatched(title, year) {
+  async markWatched(title, year, rating = 0) {
     if (State.films.find(f => f.title.toLowerCase() === title.toLowerCase())) {
       toast("Déjà dans ta liste !", "warn");
       return;
     }
-    const id = await fbAddFilm(State.user.uid, { title, year: String(year), rating: 0 });
-    State.films.unshift({ id, title, year: String(year), rating: 0 });
+    const id = await fbAddFilm(State.user.uid, { title, year: String(year), rating: rating || 0 });
+    State.films.unshift({ id, title, year: String(year), rating: rating || 0 });
     Films.updateStats();
-    toast(`"${title}" ajouté à ta liste. Pense à lui mettre une note !`);
+    const ratingTxt = rating ? ` avec ${rating}★` : "";
+    toast(`"${title}" ajouté${ratingTxt} !`);
     Detail.close();
   },
 
