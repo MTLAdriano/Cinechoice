@@ -1199,14 +1199,24 @@ window.Alice = {
 
 // ─── NEWS ─────────────────────────────────────────────────────────────────────
 const PLATFORM_PROVIDERS = {
-  "Netflix":     8,
-  "Prime Video": 9,
-  "Canal+":      35,
-  "Disney+":     337,
-  "Apple TV+":   350,
-  "OCS":         56,
-  "Mubi":        100
+  "Netflix":     [8],
+  "Prime Video": [9, 119],      // Amazon Prime + Amazon Video
+  "Canal+":      [190, 381],    // Canal+ FR + Canal+ series
+  "Disney+":     [337],
+  "Apple TV+":   [350],
+  "OCS":         [56, 1899],    // OCS + Max (ex-OCS)
+  "Mubi":        [100],
+  "Cinéma":      []             // Cinéma = pas de streaming
 };
+
+function getProviderIds(platforms) {
+  const ids = [];
+  platforms.forEach(p => {
+    const arr = PLATFORM_PROVIDERS[p] || [];
+    ids.push(...arr);
+  });
+  return [...new Set(ids)]; // deduplicate
+}
 
 window.News = {
   _allItems: [],
@@ -1280,9 +1290,11 @@ window.News = {
       return;
     }
     const platforms = (State.profile && State.profile.platforms) || [];
-    const providerIds = platforms.map(p => PLATFORM_PROVIDERS[p]).filter(Boolean).join("|");
+    const ids = getProviderIds(platforms);
+    const providerIds = ids.join("|");
     if (!providerIds) {
-      $("news-grid").innerHTML = '<p class="empty-state">Configure tes plateformes dans Profil.</p>';
+      // Cinéma only or no platforms — fetch popular movies without provider filter
+      $("news-grid").innerHTML = '<p class="empty-state">Aucune plateforme streaming configurée.<br>Ajoute Netflix, Canal+... dans Profil.</p>';
       return;
     }
     $("news-grid").innerHTML = '<div class="loading-inline">Chargement des sorties…</div>';
@@ -1322,7 +1334,7 @@ window.News = {
       ].sort((a,b) => new Date(b.date) - new Date(a.date));
 
       // Fetch provider info for each item to know which platform
-      await News._fetchProviders(key, providerIds);
+      await News._fetchProviders(key);
 
       News._loaded = true;
       News.render();
@@ -1332,10 +1344,9 @@ window.News = {
     }
   },
 
-  async _fetchProviders(key, providerIds) {
-    // Fetch provider for first 10 items to label them
-    const first10 = News._allItems.slice(0, 20);
-    await Promise.all(first10.map(async item => {
+  async _fetchProviders(key) {
+    const first20 = News._allItems.slice(0, 20);
+    await Promise.all(first20.map(async item => {
       try {
         const endpoint = item.type === "movie" ? "movie" : "tv";
         const res = await fetch("https://api.themoviedb.org/3/" + endpoint + "/" + item.id + "/watch/providers?api_key=" + key);
@@ -1343,8 +1354,12 @@ window.News = {
         const fr = data.results && data.results.FR;
         if (fr && fr.flatrate && fr.flatrate.length > 0) {
           const pid = fr.flatrate[0].provider_id;
-          const found = Object.entries(PLATFORM_PROVIDERS).find(([,id]) => id === pid);
-          item.platform = found ? found[0] : fr.flatrate[0].provider_name;
+          // Match against our platform list
+          let found = null;
+          for (const [name, ids] of Object.entries(PLATFORM_PROVIDERS)) {
+            if (Array.isArray(ids) && ids.includes(pid)) { found = name; break; }
+          }
+          item.platform = found || fr.flatrate[0].provider_name;
         }
       } catch(e) {}
     }));
