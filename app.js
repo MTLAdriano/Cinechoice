@@ -1444,11 +1444,38 @@ window.News = {
             '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Voir sur YouTube' +
           '</a>' +
         '</div>' +
-        '<div style="display:flex;gap:10px;margin-top:1rem">' +
-          '<button class="btn-full btn-accent" onclick="Watchlist.add({title:'' + item.title.replace(/'/g,"\'") + '',year:'' + (item.date||"").substring(0,4) + '',genre:'' + (item.type==="movie"?"Film":"Série") + '',platform:'' + (item.platform||"") + ''});toast('Ajouté à ta liste !')">🔖 À voir</button>' +
-          '<button class="btn-sec" style="flex:1" onclick="Films.markWatched('' + item.title.replace(/'/g,"\'") + '','' + (item.date||"").substring(0,4) + '',0)">✓ Déjà vu</button>' +
-        '</div>' +
+        // action buttons added via DOM below
+
+
+
       '</div>';
+
+    // Add action buttons via DOM to avoid escaping issues
+    const detailBody = $("news-detail-content").querySelector(".detail-body");
+    if (detailBody) {
+      const btnRow = document.createElement("div");
+      btnRow.style.cssText = "display:flex;gap:10px;margin-top:1rem";
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn-full btn-accent";
+      saveBtn.innerHTML = "🔖 À voir";
+      saveBtn.addEventListener("click", () => {
+        Watchlist.add({ title: item.title, year: (item.date||"").substring(0,4), genre: item.type==="movie"?"Film":"Série", platform: item.platform||"" });
+        toast("Ajouté à ta liste !");
+      });
+
+      const seenBtn = document.createElement("button");
+      seenBtn.className = "btn-sec";
+      seenBtn.style.flex = "1";
+      seenBtn.innerHTML = "✓ Déjà vu";
+      seenBtn.addEventListener("click", () => {
+        Films.markWatched(item.title, (item.date||"").substring(0,4), 0);
+      });
+
+      btnRow.appendChild(saveBtn);
+      btnRow.appendChild(seenBtn);
+      detailBody.appendChild(btnRow);
+    }
 
     $("news-detail").style.display = "block";
     $("news-grid").parentElement.querySelectorAll(":scope > *:not(#news-detail)").forEach(el => el.style.display = "none");
