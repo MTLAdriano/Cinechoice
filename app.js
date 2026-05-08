@@ -1053,12 +1053,13 @@ window.Watchlist = {
   render() {
     const el = $("watchlist-grid");
     if (!el) return;
-    $("watchlist-count").textContent = State.watchlist.length;
-    if (!State.watchlist.length) {
+    const wlList = Watchlist.currentList();
+    const countEl = $("watchlist-count");
+    if (countEl) countEl.textContent = wlList.length;
+    if (!wlList.length) {
       el.innerHTML = '<p class="empty-state">Ta liste est vide.<br>Ajoute des films depuis les recommandations !</p>';
       return;
     }
-    // Build using DOM to avoid escaping issues
     el.innerHTML = "";
     wlList.forEach(f => {
       const badge = document.createElement("div");
