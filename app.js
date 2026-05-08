@@ -871,9 +871,12 @@ window.Watchlist = {
     toast('Retiré de ta liste.');
   },
   async markWatched(film) {
-    // Add to seen films with rating 0 and remove from watchlist
     await Films.markWatched(film.title, film.year, 0);
     await Watchlist.remove(film.id);
+  },
+  async markWatchedById(id) {
+    const film = State.watchlist.find(f => f.id === id);
+    if (film) await Watchlist.markWatched(film);
   },
   render() {
     const el = $("watchlist-grid");
