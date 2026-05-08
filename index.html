@@ -308,13 +308,6 @@
 
       <!-- Detail panel -->
       <div id="film-detail" style="display:none">
-        <header class="page-header">
-          <button class="btn-icon" onclick="Detail.close()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-          </button>
-          <span class="logo-sm">Détail</span>
-          <div style="width:32px"></div>
-        </header>
         <div id="detail-content"></div>
       </div>
     </div>
@@ -429,6 +422,13 @@
         <input type="password" id="api-key-input" class="add-input" placeholder="gsk_…" style="width:100%;margin-bottom:8px">
         <p style="font-size:12px;opacity:.5;margin-bottom:8px">Clé Groq gratuite — stockée localement, jamais envoyée à Firebase.</p>
         <button class="btn-sm" onclick="Settings.saveAPIKey()">Sauvegarder</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Clé API TMDB (affiches)</div>
+        <input type="password" id="tmdb-key-input" class="add-input" placeholder="Clé TMDB…" style="width:100%;margin-bottom:8px">
+        <p style="font-size:12px;opacity:.5;margin-bottom:8px">Pour afficher les affiches de films. Gratuit sur themoviedb.org</p>
+        <button class="btn-sm" onclick="Settings.saveTMDBKey()">Sauvegarder</button>
       </div>
 
       <div class="settings-section" style="border:none">
