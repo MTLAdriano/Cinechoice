@@ -351,10 +351,11 @@ window.AI = {
 
     // Build dynamic ratings from Firebase
     const allRated   = State.films.filter(f => f.rating > 0).sort((a,b) => b.rating - a.rating);
-    const loved      = allRated.filter(f => f.rating >= 4.5).map(f => `${f.title} (${f.rating}★)`).join(", ");
-    const liked      = allRated.filter(f => f.rating >= 3.5 && f.rating < 4.5).map(f => `${f.title} (${f.rating}★)`).slice(0, 30).join(", ");
-    const disliked   = allRated.filter(f => f.rating <= 2).map(f => `${f.title} (${f.rating}★)`).join(", ");
-    const allSeen    = State.films.map(f => f.title).join(", ");
+    const loved    = allRated.filter(f => f.rating >= 4.5).map(f => f.title + " (" + f.rating + "★)").slice(0, 25).join(", ");
+    const liked    = allRated.filter(f => f.rating >= 3.5 && f.rating < 4.5).map(f => f.title + " (" + f.rating + "★)").slice(0, 15).join(", ");
+    const disliked = allRated.filter(f => f.rating <= 2).map(f => f.title + " (" + f.rating + "★)").slice(0, 10).join(", ");
+    // Limit seen films to avoid token overflow
+    const allSeen = State.films.map(f => f.title).slice(0, 100).join(", ");
 
     // Fallback hardcoded if Firebase empty
     const topFallback = "12 Angry Men (5★), Parasite (5★), Whiplash (5★), Taxi Driver (5★), The Godfather (5★), In the Mood for Love (5★), Good Will Hunting (4.5★), Past Lives (4.5★), The Dark Knight (4.5★), Mulholland Drive (4.5★), Se7en (4.5★), GoodFellas (4.5★), Incendies (4.5★), La La Land (4.5★)";
@@ -430,7 +431,7 @@ Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau
           "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: "llama-3.1-8b-instant",
+          model: "llama-3.3-70b-versatile",
           temperature: 0.8,
           max_tokens: 4000,
           messages: [
@@ -713,20 +714,15 @@ window.Detail = {
       ratingsEl.style.display = "block";
     }
 
-    // Inject YouTube trailer
+    // YouTube trailer — open directly (no embed due to CORS)
     const trailerEl = document.getElementById("detail-trailer-el");
-    if (trailerEl) {
-      if (youtubeId) {
-        trailerEl.innerHTML =
-          '<div class="trailer-embed">' +
-            '<iframe src="https://www.youtube.com/embed/' + youtubeId + '?rel=0&modestbranding=1" ' +
-            'frameborder="0" allowfullscreen ' +
-            'style="width:100%;height:200px;border-radius:10px;display:block"></iframe>' +
-          '</div>';
-      } else {
-        const ytUrl = "https://www.youtube.com/results?search_query=" + encodeURIComponent(f.trailerQuery || f.title + " trailer");
-        trailerEl.innerHTML = '<a href="' + ytUrl + '" target="_blank" class="trailer-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Voir sur YouTube</a>';
-      }
+    if (trailerEl && youtubeId) {
+      const ytUrl = "https://www.youtube.com/watch?v=" + youtubeId;
+      trailerEl.innerHTML =
+        '<a href="' + ytUrl + '" target="_blank" class="trailer-btn trailer-btn-yt">' +
+          '<svg width="20" height="20" viewBox="0 0 24 24" fill="#ff0000"><path d="M23 7s-.3-2-1.2-2.8c-1.1-1.2-2.4-1.2-3-1.3C16.2 2.8 12 2.8 12 2.8s-4.2 0-6.8.2c-.6.1-1.9.1-3 1.3C1.3 5 1 7 1 7S.7 9.1.7 11.2v2c0 2 .3 4.2.3 4.2s.3 2 1.2 2.8c1.1 1.2 2.6 1.1 3.3 1.2C7.2 21.6 12 21.6 12 21.6s4.2 0 6.8-.3c.6-.1 1.9-.1 3-1.3.9-.8 1.2-2.8 1.2-2.8s.3-2.1.3-4.2v-2C23.3 9.1 23 7 23 7zM9.7 15.5V8.4l8.1 3.6-8.1 3.5z"/></svg>' +
+          '<span>Voir la bande-annonce</span>' +
+        '</a>';
     }
 
     // Load similar films
@@ -1608,7 +1604,7 @@ window.News = {
     fetchYouTubeTrailer(item.title, item.date ? item.date.substring(0,4) : "").then(vid => {
       const el = $("news-trailer-el");
       if (el && vid) {
-        el.innerHTML = '<iframe src="https://www.youtube.com/embed/' + vid + '?rel=0&modestbranding=1" frameborder="0" allowfullscreen style="width:100%;height:200px;border-radius:10px;display:block"></iframe>';
+        el.innerHTML = '<a href="https://www.youtube.com/watch?v=' + vid + '" target="_blank" class="trailer-btn trailer-btn-yt"><svg width="20" height="20" viewBox="0 0 24 24" fill="#ff0000"><path d="M23 7s-.3-2-1.2-2.8c-1.1-1.2-2.4-1.2-3-1.3C16.2 2.8 12 2.8 12 2.8s-4.2 0-6.8.2c-.6.1-1.9.1-3 1.3C1.3 5 1 7 1 7S.7 9.1.7 11.2v2c0 2 .3 4.2.3 4.2s.3 2 1.2 2.8c1.1 1.2 2.6 1.1 3.3 1.2C7.2 21.6 12 21.6 12 21.6s4.2 0 6.8-.3c.6-.1 1.9-.1 3-1.3.9-.8 1.2-2.8 1.2-2.8s.3-2.1.3-4.2v-2C23.3 9.1 23 7 23 7zM9.7 15.5V8.4l8.1 3.6-8.1 3.5z"/></svg><span>Voir la bande-annonce</span></a>';
       }
     });
     fetchOMDb(item.title, item.date ? item.date.substring(0,4) : "").then(omdb => {
