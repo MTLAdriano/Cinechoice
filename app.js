@@ -588,13 +588,19 @@ window.Detail = {
             '<div class="detail-label">Avec</div>' +
             '<div class="cast-row">' + f.cast.map(a => '<span class="cast-tag">' + a + '</span>').join("") + '</div>' +
           '</div>' : "") +
+        '<div class="detail-section" id="detail-ratings" style="display:none"></div>' +
+
         '<div class="detail-section">' +
           '<div class="detail-label">Bande-annonce</div>' +
-          '<a href="' + trailerUrl + '" target="_blank" class="trailer-btn">' +
-            '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>' +
-            ' Voir sur YouTube' +
-          '</a>' +
+          '<div id="detail-trailer-el">' +
+            '<a href="' + trailerUrl + '" target="_blank" class="trailer-btn">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>' +
+              ' Voir sur YouTube' +
+            '</a>' +
+          '</div>' +
         '</div>' +
+
+        '<div class="detail-section" id="detail-similar" style="display:none"></div>' +
         '<div class="detail-section">' +
           '<div class="detail-label">Compatibilité</div>' +
           '<div class="compat-bar-wrap"><div class="compat-bar-fill" style="width:' + f.compatScore + '%"></div></div>' +
@@ -620,18 +626,81 @@ window.Detail = {
     $("hero-section").style.display = "none";
     window.scrollTo(0, 0);
 
-    // Load images async
-    const [poster, backdrop] = await Promise.all([
+    // Load all enrichment data in parallel
+    const [poster, backdrop, omdb, youtubeId] = await Promise.all([
       fetchPoster(f.title, f.year),
-      fetchBackdrop(f.title, f.year)
+      fetchBackdrop(f.title, f.year),
+      fetchOMDb(f.title, f.year),
+      fetchYouTubeTrailer(f.title, f.year)
     ]);
+
+    // Update poster
     const posterEl = document.getElementById("detail-poster-el");
     if (posterEl && poster) {
       posterEl.innerHTML = '<img src="' + poster + '" alt="' + f.title + '" style="width:100%;height:100%;object-fit:cover;display:block">';
     }
+
+    // Update backdrop
     const backdropEl = document.getElementById("detail-backdrop-el");
     if (backdropEl && backdrop) {
       backdropEl.outerHTML = '<img src="' + backdrop + '" alt="' + f.title + '" style="width:100%;height:100%;object-fit:cover;display:block">';
+    }
+
+    // Inject OMDb ratings
+    const ratingsEl = document.getElementById("detail-ratings");
+    if (ratingsEl && omdb) {
+      let ratingsHtml = '<div class="detail-label">Notes presse</div><div class="ratings-row">';
+      if (omdb.imdb)  ratingsHtml += '<div class="rating-badge rating-imdb"><span class="rating-src">IMDb</span><span class="rating-val">' + omdb.imdb + '/10</span></div>';
+      if (omdb.rt)    ratingsHtml += '<div class="rating-badge rating-rt"><span class="rating-src">🍅 RT</span><span class="rating-val">' + omdb.rt + '</span></div>';
+      if (omdb.meta)  ratingsHtml += '<div class="rating-badge rating-meta"><span class="rating-src">Metacritic</span><span class="rating-val">' + omdb.meta + '</span></div>';
+      ratingsHtml += '</div>';
+      if (omdb.awards) ratingsHtml += '<div class="detail-awards">' + omdb.awards + '</div>';
+      ratingsEl.innerHTML = ratingsHtml;
+      ratingsEl.style.display = "block";
+    }
+
+    // Inject YouTube trailer
+    const trailerEl = document.getElementById("detail-trailer-el");
+    if (trailerEl) {
+      if (youtubeId) {
+        trailerEl.innerHTML =
+          '<div class="trailer-embed">' +
+            '<iframe src="https://www.youtube.com/embed/' + youtubeId + '?rel=0&modestbranding=1" ' +
+            'frameborder="0" allowfullscreen ' +
+            'style="width:100%;height:200px;border-radius:10px;display:block"></iframe>' +
+          '</div>';
+      } else {
+        const ytUrl = "https://www.youtube.com/results?search_query=" + encodeURIComponent(f.trailerQuery || f.title + " trailer");
+        trailerEl.innerHTML = '<a href="' + ytUrl + '" target="_blank" class="trailer-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Voir sur YouTube</a>';
+      }
+    }
+
+    // Load similar films
+    const tmdbData = await tmdbSearch(f.title, f.year);
+    if (tmdbData) {
+      const similar = await fetchSimilar(tmdbData.id, "movie");
+      const simEl = document.getElementById("detail-similar");
+      if (simEl && similar.length) {
+        simEl.style.display = "block";
+        simEl.innerHTML = '<div class="detail-label">Films similaires</div><div class="similar-row" id="similar-row"></div>';
+        const row = document.getElementById("similar-row");
+        similar.forEach(s => {
+          const div = document.createElement("div");
+          div.className = "similar-card";
+          div.innerHTML =
+            '<div class="similar-poster">' +
+              (s.poster ? '<img src="' + s.poster + '" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:6px">' : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px">🎬</div>') +
+            '</div>' +
+            '<div class="similar-title">' + s.title + '</div>' +
+            '<div class="similar-rating">★ ' + s.rating + '</div>';
+          div.style.cursor = "pointer";
+          div.addEventListener("click", () => {
+            Watchlist.add({ title: s.title, year: s.year, genre: "", platform: "" });
+            toast("🔖 " + s.title + " ajouté à ta liste !");
+          });
+          row.appendChild(div);
+        });
+      }
     }
   },
   setMarkStar(n) {
@@ -1466,17 +1535,40 @@ window.News = {
           '<div class="detail-label">Synopsis</div>' +
           '<p class="detail-text">' + (item.overview || "Synopsis non disponible.") + '</p>' +
         '</div>' +
+        '<div class="detail-section" id="news-ratings-el" style="display:none"><div class="detail-label">Notes presse</div></div>' +
         '<div class="detail-section">' +
           '<div class="detail-label">Bande-annonce</div>' +
-          '<a href="' + trailerUrl + '" target="_blank" class="trailer-btn">' +
-            '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Voir sur YouTube' +
-          '</a>' +
+          '<div id="news-trailer-el">' +
+            '<a href="' + trailerUrl + '" target="_blank" class="trailer-btn">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Voir sur YouTube' +
+            '</a>' +
+          '</div>' +
         '</div>' +
         // action buttons added via DOM below
 
 
 
       '</div>';
+
+    // Enrich news detail with YouTube + OMDb
+    fetchYouTubeTrailer(item.title, item.date ? item.date.substring(0,4) : "").then(vid => {
+      const el = $("news-trailer-el");
+      if (el && vid) {
+        el.innerHTML = '<iframe src="https://www.youtube.com/embed/' + vid + '?rel=0&modestbranding=1" frameborder="0" allowfullscreen style="width:100%;height:200px;border-radius:10px;display:block"></iframe>';
+      }
+    });
+    fetchOMDb(item.title, item.date ? item.date.substring(0,4) : "").then(omdb => {
+      const el = $("news-ratings-el");
+      if (el && omdb) {
+        let html = '<div class="ratings-row">';
+        if (omdb.imdb) html += '<div class="rating-badge rating-imdb"><span class="rating-src">IMDb</span><span class="rating-val">' + omdb.imdb + '/10</span></div>';
+        if (omdb.rt)   html += '<div class="rating-badge rating-rt"><span class="rating-src">🍅 RT</span><span class="rating-val">' + omdb.rt + '</span></div>';
+        if (omdb.meta) html += '<div class="rating-badge rating-meta"><span class="rating-src">Metacritic</span><span class="rating-val">' + omdb.meta + '</span></div>';
+        html += '</div>';
+        el.innerHTML = html;
+        el.style.display = "block";
+      }
+    });
 
     // Add action buttons via DOM to avoid escaping issues
     const detailBody = $("news-detail-content").querySelector(".detail-body");
@@ -1539,8 +1631,10 @@ fbOnAuth(async (user) => {
 
   // Load ALL keys from Firebase into localStorage for this session
   if (State.profile) {
-    if (State.profile.tmdbKey)  localStorage.setItem("cinescope_tmdbkey",  State.profile.tmdbKey);
-    if (State.profile.groqKey)  localStorage.setItem("cinescope_apikey",   State.profile.groqKey);
+    if (State.profile.tmdbKey)    localStorage.setItem("cinescope_tmdbkey",    State.profile.tmdbKey);
+    if (State.profile.groqKey)    localStorage.setItem("cinescope_apikey",     State.profile.groqKey);
+    if (State.profile.omdbKey)    localStorage.setItem("cinescope_omdbkey",    State.profile.omdbKey);
+    if (State.profile.youtubeKey) localStorage.setItem("cinescope_youtubekey", State.profile.youtubeKey);
   }
 
   Settings.syncUI();
