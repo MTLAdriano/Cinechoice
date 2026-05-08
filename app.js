@@ -1304,17 +1304,30 @@ window.News = {
     const from  = new Date(Date.now() - days*24*60*60*1000).toISOString().split("T")[0];
 
     try {
-      const [moviesRes, tvRes] = await Promise.all([
-        fetch("https://api.themoviedb.org/3/discover/movie?api_key=" + key +
-          "&language=fr-FR&region=FR&sort_by=release_date.desc" +
+      // Fetch multiple pages for more results
+      const fetchAll = async (url) => {
+        const res1 = await fetch(url + "&page=1");
+        const d1 = await res1.json();
+        let results = d1.results || [];
+        if (d1.total_pages > 1) {
+          const res2 = await fetch(url + "&page=2");
+          const d2 = await res2.json();
+          results = [...results, ...(d2.results||[])];
+        }
+        return { results };
+      };
+
+      const [movies, tv] = await Promise.all([
+        fetchAll("https://api.themoviedb.org/3/discover/movie?api_key=" + key +
+          "&language=fr-FR&sort_by=popularity.desc" +
           "&release_date.lte=" + today + "&release_date.gte=" + from +
-          "&with_watch_providers=" + providerIds + "&watch_region=FR&vote_count.gte=5"),
-        fetch("https://api.themoviedb.org/3/discover/tv?api_key=" + key +
-          "&language=fr-FR&sort_by=first_air_date.desc" +
+          "&with_watch_providers=" + providerIds + "&watch_region=FR"),
+        fetchAll("https://api.themoviedb.org/3/discover/tv?api_key=" + key +
+          "&language=fr-FR&sort_by=popularity.desc" +
           "&first_air_date.lte=" + today + "&first_air_date.gte=" + from +
-          "&with_watch_providers=" + providerIds + "&watch_region=FR&vote_count.gte=5")
+          "&with_watch_providers=" + providerIds + "&watch_region=FR")
       ]);
-      const [movies, tv] = await Promise.all([moviesRes.json(), tvRes.json()]);
+
 
       const toItem = (m, type) => ({
         id: m.id, type,
