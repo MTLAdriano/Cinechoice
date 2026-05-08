@@ -886,29 +886,41 @@ window.Watchlist = {
       el.innerHTML = '<p class="empty-state">Ta liste est vide.<br>Ajoute des films depuis les recommandations !</p>';
       return;
     }
-    el.innerHTML = State.watchlist.map(f =>
-      '<div class="wl-badge" id="wl-' + f.id + '">' +
-        '<div class="wl-poster" id="wl-poster-' + f.id + '">' +
-          '<div class="wl-poster-placeholder">🎬</div>' +
-        '</div>' +
-        '<div class="wl-info">' +
-          '<div class="wl-title">' + f.title + '</div>' +
-          '<div class="wl-year">' + (f.year || "") + ' · ' + (f.platform || "") + '</div>' +
-        '</div>' +
-        '<div class="wl-actions">' +
-          '<button class="wl-btn wl-seen" onclick="Watchlist.markWatched(' + JSON.stringify(f).replace(/"/g,"'") + ')" title="Marquer vu">✓</button>' +
-          '<button class="wl-btn wl-del" onclick="Watchlist.remove(\\'' + f.id + '\\')" title="Retirer">✕</button>' +
-        '</div>' +
-      '</div>'
-    ).join("");
-
-    // Load posters
-    State.watchlist.forEach(async f => {
-      const poster = await fetchPoster(f.title, f.year);
-      const wrap = document.getElementById("wl-poster-" + f.id);
-      if (wrap && poster) {
-        wrap.innerHTML = '<img src="' + poster + '" alt="' + f.title + '" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:8px">';
-      }
+    // Build using DOM to avoid escaping issues
+    el.innerHTML = "";
+    State.watchlist.forEach(f => {
+      const badge = document.createElement("div");
+      badge.className = "wl-badge";
+      badge.id = "wl-" + f.id;
+      const posterDiv = document.createElement("div");
+      posterDiv.className = "wl-poster";
+      posterDiv.id = "wl-poster-" + f.id;
+      posterDiv.innerHTML = '<div class="wl-poster-placeholder">🎬</div>';
+      const info = document.createElement("div");
+      info.className = "wl-info";
+      info.innerHTML = '<div class="wl-title">' + f.title + '</div><div class="wl-year">' + (f.year||"") + (f.platform?" · "+f.platform:"") + '</div>';
+      const actions = document.createElement("div");
+      actions.className = "wl-actions";
+      const seenBtn = document.createElement("button");
+      seenBtn.className = "wl-btn wl-seen";
+      seenBtn.title = "Marquer vu";
+      seenBtn.textContent = "✓";
+      seenBtn.addEventListener("click", () => Watchlist.markWatchedById(f.id));
+      const delBtn = document.createElement("button");
+      delBtn.className = "wl-btn wl-del";
+      delBtn.title = "Retirer";
+      delBtn.textContent = "✕";
+      delBtn.addEventListener("click", () => Watchlist.remove(f.id));
+      actions.appendChild(seenBtn);
+      actions.appendChild(delBtn);
+      badge.appendChild(posterDiv);
+      badge.appendChild(info);
+      badge.appendChild(actions);
+      el.appendChild(badge);
+      fetchPoster(f.title, f.year).then(poster => {
+        const wrap = document.getElementById("wl-poster-" + f.id);
+        if (wrap && poster) wrap.innerHTML = '<img src="' + poster + '" alt="' + f.title + '" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:8px">';
+      });
     });
   }
 };
@@ -922,7 +934,7 @@ window.Alice = {
   },
   async add(title, year, rating) {
     if (State.aliceFilms.find(f => f.title.toLowerCase() === title.toLowerCase())) {
-      toast('Déjà dans la liste d'Alice !', "warn"); return;
+      toast("Déjà dans la liste d'Alice !", "warn"); return;
     }
     const id = await fbAddAliceFilm(State.user.uid, { title, year, rating: rating || 0 });
     State.aliceFilms.unshift({ id, title, year, rating: rating || 0 });
@@ -943,21 +955,31 @@ window.Alice = {
     const el = $("alice-film-list");
     if (!el) return;
     if (!State.aliceFilms.length) {
-      el.innerHTML = '<p class="empty-state">Aucun film d'Alice.<br>Importe son CSV Letterboxd ou ajoute manuellement.</p>';
+      el.innerHTML = "<p class=\"empty-state\">Aucun film d'Alice.<br>Importe son CSV Letterboxd.</p>";
       return;
     }
-    el.innerHTML = State.aliceFilms.map(f =>
-      '<div class="film-row">' +
-        '<div class="film-info">' +
-          '<div class="film-title">' + f.title + '</div>' +
-          '<div class="film-year">' + (f.year || "") + '</div>' +
-        '</div>' +
-        '<div class="film-row-right">' +
-          '<div class="film-stars">' + starsHtml(f.rating || 0) + '</div>' +
-          '<button class="del-btn" onclick="Alice.remove(\\'' + f.id + '\\')">✕</button>' +
-        '</div>' +
-      '</div>'
-    ).join("");
+    el.innerHTML = "";
+    State.aliceFilms.forEach(f => {
+      const row = document.createElement("div");
+      row.className = "film-row";
+      const info = document.createElement("div");
+      info.className = "film-info";
+      info.innerHTML = '<div class="film-title">' + f.title + '</div><div class="film-year">' + (f.year||"") + '</div>';
+      const right = document.createElement("div");
+      right.className = "film-row-right";
+      const stars = document.createElement("div");
+      stars.className = "film-stars";
+      stars.textContent = starsHtml(f.rating || 0);
+      const del = document.createElement("button");
+      del.className = "del-btn";
+      del.textContent = "✕";
+      del.addEventListener("click", () => Alice.remove(f.id));
+      right.appendChild(stars);
+      right.appendChild(del);
+      row.appendChild(info);
+      row.appendChild(right);
+      el.appendChild(row);
+    });
   },
   updateStats() {
     const el = $("alice-stat-total");
