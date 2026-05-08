@@ -45,7 +45,8 @@ function getAPIKey() {
   return localStorage.getItem("cinescope_apikey") || "";
 }
 function getTMDBKey() {
-  return localStorage.getItem("cinescope_tmdbkey") || "";
+  // First check localStorage, then profile
+  return localStorage.getItem("cinescope_tmdbkey") || (State.profile && State.profile.tmdbKey) || "";
 }
 async function tmdbSearch(title, year) {
   const key = getTMDBKey();
@@ -686,15 +687,17 @@ window.Settings = {
       $("api-key-input").value = "••••••••••••••••";
     }
   },
-  saveTMDBKey() {
+  async saveTMDBKey() {
     const input = $("tmdb-key-input");
     if (!input) return;
     const val = input.value.trim();
     if (!val || val.startsWith("•")) { toast("Entre une clé TMDB valide.", "warn"); return; }
+    // Save to both localStorage and Firebase
     localStorage.setItem("cinescope_tmdbkey", val);
+    await fbSaveProfile(State.user.uid, { tmdbKey: val });
+    if (State.profile) State.profile.tmdbKey = val;
     toast("Clé TMDB sauvegardée ✓");
     input.value = "••••••••••••••••";
-    console.log("TMDB key saved:", val.substring(0,8) + "...");
   }
 };
 
