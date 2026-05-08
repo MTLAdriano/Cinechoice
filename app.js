@@ -403,108 +403,177 @@ Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau
 // ─── RECO RENDER ───────────────────────────────────────────────────────────────
 window.Reco = {
   current: [],
-  render(recos) {
+  async render(recos) {
     Reco.current = recos;
     const w = State.wizard;
     $("results-meta").innerHTML =
-      `<span class="meta-tag">${w.who === "chaton" ? "Avec chaton 🐱" : "Solo"}</span>` +
-      (w.moods.length ? w.moods.map(m => `<span class="meta-tag">${m}</span>`).join("") : "") +
-      `<span class="meta-tag">Max ${fmtDur(w.dur)}</span>`;
+      '<span class="meta-tag">' + (w.who === "chaton" ? "Avec chaton 🐱" : "Solo") + '</span>' +
+      (w.moods.length ? w.moods.map(m => '<span class="meta-tag">' + m + '</span>').join("") : "") +
+      '<span class="meta-tag">Max ' + fmtDur(w.dur) + '</span>';
 
-    $("reco-list").innerHTML = recos.map((f, i) => `
-      <div class="reco-card" onclick="Detail.open(${i})">
-        <div class="reco-card-inner">
-          <div class="reco-card-main">
-            <div class="reco-title">${f.title} <span class="reco-year">${f.year}</span></div>
-            <div class="reco-meta">
-              <span class="reco-genre">${f.genre}</span>
-              <span class="reco-sep">·</span>
-              <span>${fmtDur(f.duration)}</span>
-              <span class="reco-sep">·</span>
-              <span class="reco-platform">${f.platform}</span>
-            </div>
-            <div class="reco-hook">${f.hook}</div>
-          </div>
-          <div class="reco-card-right">
-            <div class="compat-score">${f.compatScore}<span class="compat-pct">%</span></div>
-            <div class="compat-label">compatibilité</div>
-            <div class="reco-arrow">→</div>
-          </div>
-        </div>
-      </div>`).join("");
+    $("reco-list").innerHTML = recos.map((f, i) =>
+      '<div class="reco-card" onclick="Detail.open(' + i + ')">' +
+        '<div class="reco-card-inner">' +
+          '<div class="reco-poster" id="poster-wrap-' + i + '">' +
+            '<div class="reco-poster-placeholder">🎬</div>' +
+          '</div>' +
+          '<div class="reco-card-main">' +
+            '<div>' +
+              '<div class="reco-title">' + f.title + ' <span class="reco-year">' + f.year + '</span></div>' +
+              '<div class="reco-meta-row">' +
+                '<span>' + f.genre + '</span>' +
+                '<span class="reco-sep">·</span>' +
+                '<span>' + fmtDur(f.duration) + '</span>' +
+                '<span class="reco-sep">·</span>' +
+                '<span class="reco-platform">' + f.platform + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="reco-hook">' + f.hook + '</div>' +
+          '</div>' +
+          '<div class="reco-card-right">' +
+            '<div class="compat-score">' + f.compatScore + '<span class="compat-pct">%</span></div>' +
+            '<div class="compat-label">match</div>' +
+            '<div class="reco-arrow">→</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    ).join("");
+
+    // Load posters async
+    recos.forEach(async (f, i) => {
+      const poster = await fetchPoster(f.title, f.year);
+      const wrap = document.getElementById("poster-wrap-" + i);
+      if (wrap && poster) {
+        const img = document.createElement("img");
+        img.src = poster;
+        img.alt = f.title;
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block";
+        wrap.innerHTML = "";
+        wrap.appendChild(img);
+      }
+    });
+
+    // Hero backdrop
+    const heroSection = $("hero-section");
+    if (heroSection && recos[0]) {
+      heroSection.style.display = "block";
+      $("hero-title").textContent = recos[0].title;
+      $("hero-meta").textContent = recos[0].year + " · " + recos[0].genre + " · " + recos[0].platform;
+      const backdrop = await fetchBackdrop(recos[0].title, recos[0].year);
+      const wrap = $("hero-img-wrap");
+      if (wrap) {
+        if (backdrop) {
+          wrap.innerHTML = '<img src="' + backdrop + '" alt="' + recos[0].title + '" class="hero-img">';
+        } else {
+          wrap.innerHTML = '<div class="hero-placeholder">🎬</div>';
+        }
+      }
+    }
   }
 };
 
 // ─── DETAIL ────────────────────────────────────────────────────────────────────
 window.Detail = {
-  open(i) {
+  markStarVal: 0,
+  async open(i) {
     const f = Reco.current[i];
     if (!f) return;
-    const trailerUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(f.trailerQuery)}`;
-    $("detail-content").innerHTML = `
-      <div class="detail-hero">
-        <div class="detail-title">${f.title}</div>
-        <div class="detail-subtitle">${f.year} · ${fmtDur(f.duration)} · ${f.director || ""}</div>
-        <div class="detail-meta-row">
-          <span class="badge-genre">${f.genre}</span>
-          <span class="badge-platform">${f.platform}</span>
-          <span class="badge-rating">★ ${f.rating?.toFixed(1) || "—"}</span>
-        </div>
-      </div>
+    const trailerUrl = "https://www.youtube.com/results?search_query=" + encodeURIComponent(f.trailerQuery);
+    const chatonLabel = State.wizard.who === "chaton" ? " (et chaton 🐱)" : "";
+    const safeTitle = f.title.replace(/'/g, "\\'");
 
-      <div class="detail-section">
-        <div class="detail-label">Pourquoi ce film pour toi</div>
-        <p class="detail-why">${f.why}</p>
-      </div>
+    $("detail-content").innerHTML =
+      '<div class="detail-backdrop">' +
+        '<div id="detail-backdrop-el" class="detail-backdrop-placeholder">🎬</div>' +
+        '<div class="detail-backdrop-gradient"></div>' +
+        '<div class="detail-header-overlay">' +
+          '<button class="btn-icon" onclick="Detail.close()" style="background:rgba(247,242,234,.9);border-radius:50%;width:36px;height:36px">' +
+            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="detail-body">' +
+        '<div class="detail-poster-row">' +
+          '<div class="detail-poster" id="detail-poster-el">' +
+            '<div class="detail-poster-placeholder">🎬</div>' +
+          '</div>' +
+          '<div class="detail-title-block">' +
+            '<div class="detail-title">' + f.title + '</div>' +
+            '<div class="detail-subtitle">' + f.year + ' · ' + fmtDur(f.duration) + ' · ' + (f.director || "") + '</div>' +
+            '<div class="detail-meta-row">' +
+              '<span class="badge-genre">' + f.genre + '</span>' +
+              '<span class="badge-platform">' + f.platform + '</span>' +
+              '<span class="badge-rating">★ ' + (f.rating ? f.rating.toFixed(1) : "—") + '</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="detail-section">' +
+          '<div class="detail-label">Pourquoi ce film pour toi</div>' +
+          '<p class="detail-why">' + f.why + '</p>' +
+        '</div>' +
+        '<div class="detail-section">' +
+          '<div class="detail-label">Synopsis</div>' +
+          '<p class="detail-text">' + f.synopsis + '</p>' +
+        '</div>' +
+        (f.cast && f.cast.length ?
+          '<div class="detail-section">' +
+            '<div class="detail-label">Avec</div>' +
+            '<div class="cast-row">' + f.cast.map(a => '<span class="cast-tag">' + a + '</span>').join("") + '</div>' +
+          '</div>' : "") +
+        '<div class="detail-section">' +
+          '<div class="detail-label">Bande-annonce</div>' +
+          '<a href="' + trailerUrl + '" target="_blank" class="trailer-btn">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>' +
+            ' Voir sur YouTube' +
+          '</a>' +
+        '</div>' +
+        '<div class="detail-section">' +
+          '<div class="detail-label">Compatibilité</div>' +
+          '<div class="compat-bar-wrap"><div class="compat-bar-fill" style="width:' + f.compatScore + '%"></div></div>' +
+          '<div class="compat-bar-label">' + f.compatScore + '% avec ton profil' + chatonLabel + '</div>' +
+        '</div>' +
+        '<div class="detail-section" style="background:var(--bg2);padding:14px;border-radius:var(--radius);border:1.5px solid var(--border)">' +
+          '<div class="detail-label" style="margin-bottom:10px">Tu l\'as déjà vu ? Note-le !</div>' +
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+            '<div style="display:flex;gap:4px" id="mark-stars">' +
+              '<span class="star-btn" onclick="Detail.setMarkStar(1)">★</span>' +
+              '<span class="star-btn" onclick="Detail.setMarkStar(2)">★</span>' +
+              '<span class="star-btn" onclick="Detail.setMarkStar(3)">★</span>' +
+              '<span class="star-btn" onclick="Detail.setMarkStar(4)">★</span>' +
+              '<span class="star-btn" onclick="Detail.setMarkStar(5)">★</span>' +
+            '</div>' +
+            '<button class="btn-sm" onclick="Films.markWatched(\'' + safeTitle + '\', ' + f.year + ', Detail.markStarVal)">✓ Enregistrer</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
 
-      <div class="detail-section">
-        <div class="detail-label">Synopsis</div>
-        <p class="detail-text">${f.synopsis}</p>
-      </div>
-
-      ${f.cast?.length ? `
-      <div class="detail-section">
-        <div class="detail-label">Avec</div>
-        <div class="cast-row">${f.cast.map(a => `<span class="cast-tag">${a}</span>`).join("")}</div>
-      </div>` : ""}
-
-      <div class="detail-section">
-        <div class="detail-label">Bande-annonce</div>
-        <a href="${trailerUrl}" target="_blank" class="trailer-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Voir la bande-annonce sur YouTube
-        </a>
-      </div>
-
-      <div class="detail-section">
-        <div class="detail-label">Compatibilité</div>
-        <div class="compat-bar-wrap">
-          <div class="compat-bar-fill" style="width:${f.compatScore}%"></div>
-        </div>
-        <div class="compat-bar-label">${f.compatScore}% avec ton profil${State.wizard.who === "couple" ? " (et celui de ta copine)" : ""}</div>
-      </div>
-
-      <button class="btn-full btn-accent" style="margin-top:1.5rem" onclick="Films.markWatched('${f.title.replace(/'/g,"\\'")}', ${f.year})">
-        ✓ Marquer comme vu
-      </button>
-    `;
     $("film-detail").style.display  = "block";
     $("reco-results").style.display = "none";
-    $("detail-content").scrollTop = 0;
+    $("hero-section").style.display = "none";
     window.scrollTo(0, 0);
+
+    // Load images async
+    const [poster, backdrop] = await Promise.all([
+      fetchPoster(f.title, f.year),
+      fetchBackdrop(f.title, f.year)
+    ]);
+    const posterEl = document.getElementById("detail-poster-el");
+    if (posterEl && poster) {
+      posterEl.innerHTML = '<img src="' + poster + '" alt="' + f.title + '" style="width:100%;height:100%;object-fit:cover;display:block">';
+    }
+    const backdropEl = document.getElementById("detail-backdrop-el");
+    if (backdropEl && backdrop) {
+      backdropEl.outerHTML = '<img src="' + backdrop + '" alt="' + f.title + '" style="width:100%;height:100%;object-fit:cover;display:block">';
+    }
   },
-  markStarVal: 0,
-  setMarkStar(n, el) {
+  setMarkStar(n) {
     Detail.markStarVal = n;
-    const stars = document.querySelectorAll("#mark-stars .star-btn");
-    stars.forEach((s, i) => s.classList.toggle("lit", i < n));
+    document.querySelectorAll("#mark-stars .star-btn").forEach((s, i) => s.classList.toggle("lit", i < n));
   },
   close() {
     Detail.markStarVal = 0;
     $("film-detail").style.display  = "none";
     $("reco-results").style.display = "block";
-    const hs = $("hero-section");
-    if (hs && hs.style.display !== "none") hs.style.display = "block";
   }
 };
 
@@ -652,10 +721,14 @@ window.Settings = {
     document.querySelectorAll("#settings-gf .genre-btn").forEach(btn => {
       btn.classList.toggle("active", (p.gfGenres || []).includes(btn.dataset.g));
     });
-    // Email
     $("user-email-display").textContent = State.user?.email || "";
-    // API key
     $("api-key-input").value = getAPIKey() ? "••••••••••••••••" : "";
+    // Load TMDB key from Firebase into localStorage
+    if (State.profile && State.profile.tmdbKey) {
+      localStorage.setItem("cinescope_tmdbkey", State.profile.tmdbKey);
+    }
+    const tmdbEl = $("tmdb-key-input");
+    if (tmdbEl) tmdbEl.value = getTMDBKey() ? "••••••••••••••••" : "";
   },
 
   async savePlatforms() {
