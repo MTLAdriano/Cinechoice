@@ -188,6 +188,7 @@ window.Nav = {
     if (page === "settings") Settings.syncUI();
     if (page === "watchlist") Watchlist.render();
     if (page === "alice") { Alice.render(); Alice.updateStats(); }
+    if (page === "news") News.load();
   },
   updateForViewer(viewer) {
     // Everyone sees the same tabs — just different data
@@ -375,7 +376,7 @@ Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau
           "Authorization": `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "llama-3.1-8b-instant",
           temperature: 0.8,
           max_tokens: 4000,
           messages: [
@@ -1193,6 +1194,161 @@ window.Alice = {
       setTimeout(() => $("alice-import-status").textContent = "", 4000);
     };
     reader.readAsText(file);
+  }
+};
+
+// ─── NEWS ─────────────────────────────────────────────────────────────────────
+// TMDB provider IDs for streaming platforms
+const PLATFORM_PROVIDERS = {
+  "Netflix":     { id: 8,   name: "Netflix" },
+  "Prime Video": { id: 9,   name: "Prime Video" },
+  "Canal+":      { id: 35,  name: "Canal+" },
+  "Disney+":     { id: 337, name: "Disney+" },
+  "Apple TV+":   { id: 350, name: "Apple TV+" },
+  "OCS":         { id: 56,  name: "OCS" },
+  "Mubi":        { id: 100, name: "Mubi" }
+};
+
+window.News = {
+  _allItems: [],
+  _type: "all",
+  _loaded: false,
+
+  async load() {
+    if (News._loaded) { News.render(); return; }
+    const key = getTMDBKey();
+    if (!key) {
+      $("news-grid").innerHTML = '<p class="empty-state">Configure ta clé TMDB dans Profil pour voir les sorties.</p>';
+      return;
+    }
+
+    const platforms = (State.profile && State.profile.platforms) || [];
+    const providerIds = platforms
+      .map(p => PLATFORM_PROVIDERS[p])
+      .filter(Boolean)
+      .map(p => p.id)
+      .join("|");
+
+    if (!providerIds) {
+      $("news-grid").innerHTML = '<p class="empty-state">Configure tes plateformes dans Profil.</p>';
+      return;
+    }
+
+    $("news-grid").innerHTML = '<div class="loading-inline">Chargement des sorties…</div>';
+
+    try {
+      // Fetch recent movies on user's platforms (France region)
+      const [moviesRes, tvRes] = await Promise.all([
+        fetch("https://api.themoviedb.org/3/discover/movie?api_key=" + key +
+          "&language=fr-FR&region=FR&sort_by=release_date.desc" +
+          "&release_date.lte=" + new Date().toISOString().split("T")[0] +
+          "&release_date.gte=" + new Date(Date.now() - 60*24*60*60*1000).toISOString().split("T")[0] +
+          "&with_watch_providers=" + providerIds +
+          "&watch_region=FR&vote_count.gte=10&page=1"),
+        fetch("https://api.themoviedb.org/3/discover/tv?api_key=" + key +
+          "&language=fr-FR&sort_by=first_air_date.desc" +
+          "&first_air_date.lte=" + new Date().toISOString().split("T")[0] +
+          "&first_air_date.gte=" + new Date(Date.now() - 60*24*60*60*1000).toISOString().split("T")[0] +
+          "&with_watch_providers=" + providerIds +
+          "&watch_region=FR&vote_count.gte=10&page=1")
+      ]);
+
+      const [movies, tv] = await Promise.all([moviesRes.json(), tvRes.json()]);
+
+      const movieItems = (movies.results || []).map(m => ({
+        id: m.id, type: "movie",
+        title: m.title || m.name,
+        date: m.release_date,
+        poster: m.poster_path ? "https://image.tmdb.org/t/p/w342" + m.poster_path : null,
+        backdrop: m.backdrop_path ? "https://image.tmdb.org/t/p/w500" + m.backdrop_path : null,
+        rating: m.vote_average ? m.vote_average.toFixed(1) : "—",
+        overview: m.overview
+      }));
+
+      const tvItems = (tv.results || []).map(s => ({
+        id: s.id, type: "tv",
+        title: s.name || s.title,
+        date: s.first_air_date,
+        poster: s.poster_path ? "https://image.tmdb.org/t/p/w342" + s.poster_path : null,
+        backdrop: s.backdrop_path ? "https://image.tmdb.org/t/p/w500" + s.backdrop_path : null,
+        rating: s.vote_average ? s.vote_average.toFixed(1) : "—",
+        overview: s.overview
+      }));
+
+      News._allItems = [...movieItems, ...tvItems]
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+      News._loaded = true;
+      News.render();
+    } catch(e) {
+      console.error("News error:", e);
+      $("news-grid").innerHTML = '<p class="empty-state">Erreur de chargement. Réessaie.</p>';
+    }
+  },
+
+  filter(type, btn) {
+    News._type = type;
+    document.querySelectorAll(".news-filter").forEach(b => b.classList.remove("active"));
+    if (btn) btn.classList.add("active");
+    News.render();
+  },
+
+  render() {
+    const grid = $("news-grid");
+    if (!grid) return;
+    const items = News._type === "all" ? News._allItems
+      : News._allItems.filter(i => i.type === News._type);
+
+    if (!items.length) {
+      grid.innerHTML = '<p class="empty-state">Aucune sortie récente trouvée.<br>Essaie de changer le filtre.</p>';
+      return;
+    }
+
+    grid.innerHTML = "";
+    items.forEach(item => {
+      const card = document.createElement("div");
+      card.className = "news-card";
+
+      const alreadySeen = State.films.find(f =>
+        f.title.toLowerCase() === item.title.toLowerCase()
+      );
+
+      card.innerHTML =
+        '<div class="news-poster">' +
+          (item.poster
+            ? '<img src="' + item.poster + '" alt="' + item.title + '" style="width:100%;height:100%;object-fit:cover;display:block">'
+            : '<div class="news-poster-placeholder">🎬</div>') +
+          (alreadySeen ? '<div class="news-seen-badge">✓ Vu</div>' : '') +
+        '</div>' +
+        '<div class="news-info">' +
+          '<div class="news-type-badge">' + (item.type === "movie" ? "Film" : "Série") + '</div>' +
+          '<div class="news-title">' + item.title + '</div>' +
+          '<div class="news-meta">' +
+            '<span>★ ' + item.rating + '</span>' +
+            '<span class="reco-sep">·</span>' +
+            '<span>' + (item.date ? new Date(item.date).toLocaleDateString("fr-FR", {month:"short", day:"numeric"}) : "") + '</span>' +
+          '</div>' +
+          '<div class="news-overview">' + (item.overview || "") + '</div>' +
+        '</div>' +
+        '<button class="news-save-btn" onclick="News.addToWatchlist(' + item.id + ')" title="Ajouter à ma liste">🔖</button>';
+
+      // Store item data for watchlist
+      card.dataset.itemId = item.id;
+      News._itemMap = News._itemMap || {};
+      News._itemMap[item.id] = item;
+
+      grid.appendChild(card);
+    });
+  },
+
+  addToWatchlist(id) {
+    const item = (News._itemMap || {})[id];
+    if (!item) return;
+    Watchlist.add({
+      title: item.title,
+      year: item.date ? item.date.substring(0, 4) : "",
+      genre: item.type === "movie" ? "Film" : "Série",
+      platform: ""
+    });
   }
 };
 
