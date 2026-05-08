@@ -1217,9 +1217,10 @@ fbOnAuth(async (user) => {
     Alice.load()
   ]);
 
-  // Load TMDB key from Firebase
-  if (State.profile && State.profile.tmdbKey) {
-    localStorage.setItem("cinescope_tmdbkey", State.profile.tmdbKey);
+  // Load ALL keys from Firebase into localStorage for this session
+  if (State.profile) {
+    if (State.profile.tmdbKey)  localStorage.setItem("cinescope_tmdbkey",  State.profile.tmdbKey);
+    if (State.profile.groqKey)  localStorage.setItem("cinescope_apikey",   State.profile.groqKey);
   }
 
   Settings.syncUI();
