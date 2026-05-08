@@ -199,12 +199,12 @@ window.Wizard = {
   }
 };
 
-// ─── AI (GEMINI) ───────────────────────────────────────────────────────────────
+// ─── AI (GROQ / LLAMA) ──────────────────────────────────────────────────────────
 window.AI = {
   async getRecos(extra = "") {
     const apiKey = getAPIKey();
     if (!apiKey) {
-      toast("Ajoute ta clé API Gemini dans Profil → Clé API.", "warn");
+      toast("Ajoute ta clé API Groq dans Profil → Clé API.", "warn");
       return AI.fallbackRecos();
     }
 
@@ -276,33 +276,39 @@ Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau
 ]`;
 
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.8,
-              maxOutputTokens: 2000,
-              responseMimeType: "application/json"
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          temperature: 0.8,
+          max_tokens: 2000,
+          messages: [
+            {
+              role: "system",
+              content: "Tu es un expert en cinéma. Tu réponds UNIQUEMENT avec du JSON valide, sans markdown, sans backticks, sans texte avant ou après."
+            },
+            {
+              role: "user",
+              content: prompt
             }
-          })
-        }
-      );
+          ]
+        })
+      });
       const data = await res.json();
       if (data.error) {
-        console.error("Gemini error:", JSON.stringify(data.error));
+        console.error("Groq error:", JSON.stringify(data.error));
         throw new Error(data.error.message);
       }
-      let text = data.candidates[0].content.parts[0].text.trim();
+      let text = data.choices[0].message.content.trim();
       text = text.replace(/```json|```/g, "").trim();
-      // Handle case where Gemini wraps in array or object
       if (text.startsWith("{")) text = "[" + text + "]";
       return JSON.parse(text);
     } catch (e) {
-      console.error("Gemini API error:", e);
+      console.error("Groq API error:", e);
       toast("Erreur API — affichage de suggestions par défaut.", "warn");
       return AI.fallbackRecos();
     }
