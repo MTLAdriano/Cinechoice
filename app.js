@@ -84,6 +84,60 @@ async function fetchBackdrop(title, year) {
   return null;
 }
 
+function getOMDbKey() {
+  return localStorage.getItem("cinescope_omdbkey") || (State.profile && State.profile.omdbKey) || "440a1f7";
+}
+function getYouTubeKey() {
+  return localStorage.getItem("cinescope_youtubekey") || (State.profile && State.profile.youtubeKey) || "AIzaSyA2Ey5MFtbG_pyRxTjUBF6TV-UTHnBZws4";
+}
+
+async function fetchOMDb(title, year) {
+  const key = getOMDbKey();
+  if (!key) return null;
+  try {
+    const url = "https://www.omdbapi.com/?apikey=" + key + "&t=" + encodeURIComponent(title) + (year ? "&y=" + year : "") + "&type=movie";
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.Response === "False") return null;
+    return {
+      imdb:     data.imdbRating !== "N/A" ? data.imdbRating : null,
+      rt:       (data.Ratings||[]).find(r => r.Source === "Rotten Tomatoes")?.Value || null,
+      meta:     (data.Ratings||[]).find(r => r.Source === "Metacritic")?.Value || null,
+      awards:   data.Awards !== "N/A" ? data.Awards : null,
+    };
+  } catch(e) { return null; }
+}
+
+async function fetchYouTubeTrailer(title, year) {
+  const key = getYouTubeKey();
+  if (!key) return null;
+  try {
+    const q = encodeURIComponent(title + " " + (year||"") + " trailer officiel");
+    const url = "https://www.googleapis.com/youtube/v3/search?part=snippet&q=" + q + "&type=video&maxResults=1&key=" + key;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.items && data.items.length > 0) return data.items[0].id.videoId;
+  } catch(e) {}
+  return null;
+}
+
+async function fetchSimilar(tmdbId, type) {
+  const key = getTMDBKey();
+  if (!key || !tmdbId) return [];
+  try {
+    const endpoint = type === "tv" ? "tv" : "movie";
+    const res = await fetch("https://api.themoviedb.org/3/" + endpoint + "/" + tmdbId + "/similar?api_key=" + key + "&language=fr-FR&page=1");
+    const data = await res.json();
+    return (data.results || []).slice(0, 6).map(m => ({
+      id: m.id,
+      title: m.title || m.name,
+      year: (m.release_date || m.first_air_date || "").substring(0,4),
+      poster: m.poster_path ? "https://image.tmdb.org/t/p/w185" + m.poster_path : null,
+      rating: m.vote_average ? m.vote_average.toFixed(1) : "—"
+    }));
+  } catch(e) { return []; }
+}
+
 // ─── AUTH ──────────────────────────────────────────────────────────────────────
 window.Auth = {
   showRegister() {
