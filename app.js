@@ -339,20 +339,20 @@ RÈGLES ABSOLUES :
 6. PRIME VIDEO : uniquement les films inclus dans l'abonnement Prime de base (pas location/achat). En cas de doute, indiquer Netflix ou Canal+ à la place.
 7. Ne JAMAIS recommander un film présent dans la liste des films déjà vus
 
-Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau de 10 objets variés :
+Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau de 10 objets. Sois concis pour tenir dans les tokens :
 [
   {
-    "title": "Titre exact du film",
+    "title": "Titre",
     "year": 2019,
     "duration": 125,
     "genre": "Thriller, Drame",
     "platform": "Netflix",
-    "hook": "Une phrase d'accroche percutante de 15 mots max",
-    "why": "Explication personnalisée en 2-3 phrases basée sur les goûts de l'utilisateur",
-    "synopsis": "Synopsis complet de 4-5 phrases",
+    "hook": "Accroche max 12 mots",
+    "why": "Justification personnalisée en 1-2 phrases courtes",
+    "synopsis": "Synopsis en 2 phrases max",
     "director": "Réalisateur",
-    "cast": ["Acteur 1", "Acteur 2", "Acteur 3"],
-    "trailerQuery": "Titre film année trailer youtube",
+    "cast": ["Acteur 1", "Acteur 2"],
+    "trailerQuery": "Titre year trailer",
     "rating": 4.2,
     "compatScore": 92
   }
@@ -368,7 +368,7 @@ Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile",
           temperature: 0.8,
-          max_tokens: 2000,
+          max_tokens: 4000,
           messages: [
             {
               role: "system",
