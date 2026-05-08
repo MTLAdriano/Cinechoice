@@ -188,6 +188,15 @@ window.Nav = {
     if (page === "settings") Settings.syncUI();
     if (page === "watchlist") Watchlist.render();
     if (page === "alice") { Alice.render(); Alice.updateStats(); }
+  },
+  updateForViewer(viewer) {
+    // Everyone sees the same tabs — just different data
+    // Hide the "Alice" dedicated tab — it's now integrated
+    const navAlice = document.querySelector('.nav-btn[data-page="alice"]');
+    if (navAlice) navAlice.style.display = "none";
+    // Update Films tab label based on viewer
+    const filmsSpan = document.querySelector('.nav-btn[data-page="films"] span');
+    if (filmsSpan) filmsSpan.textContent = "Films";
   }
 };
 
@@ -422,37 +431,66 @@ window.Reco = {
       (w.moods.length ? w.moods.map(m => '<span class="meta-tag">' + m + '</span>').join("") : "") +
       '<span class="meta-tag">Max ' + fmtDur(w.dur) + '</span>';
 
-    $("reco-list").innerHTML = recos.map((f, i) =>
-      '<div class="reco-card" id="reco-card-' + i + '">' +
-        '<div class="reco-card-inner">' +
-          '<div class="reco-poster" id="poster-wrap-' + i + '">' +
-            '<div class="reco-poster-placeholder">🎬</div>' +
-          '</div>' +
-          '<div class="reco-card-main">' +
-            '<div>' +
-              '<div class="reco-title">' + f.title + ' <span class="reco-year">' + f.year + '</span></div>' +
-              '<div class="reco-meta-row">' +
-                '<span>' + f.genre + '</span>' +
-                '<span class="reco-sep">·</span>' +
-                '<span>' + fmtDur(f.duration) + '</span>' +
-                '<span class="reco-sep">·</span>' +
-                '<span class="reco-platform">' + f.platform + '</span>' +
-              '</div>' +
+    const list = $("reco-list");
+    list.innerHTML = "";
+    recos.forEach((f, i) => {
+      const card = document.createElement("div");
+      card.className = "reco-card";
+      card.id = "reco-card-" + i;
+
+      // Clickable inner
+      const inner = document.createElement("div");
+      inner.className = "reco-card-inner";
+      inner.style.cursor = "pointer";
+      inner.addEventListener("click", () => Detail.open(i));
+      inner.innerHTML =
+        '<div class="reco-poster" id="poster-wrap-' + i + '"><div class="reco-poster-placeholder">🎬</div></div>' +
+        '<div class="reco-card-main">' +
+          '<div>' +
+            '<div class="reco-title">' + f.title + ' <span class="reco-year">' + f.year + '</span></div>' +
+            '<div class="reco-meta-row">' +
+              '<span>' + f.genre + '</span><span class="reco-sep">·</span>' +
+              '<span>' + fmtDur(f.duration) + '</span><span class="reco-sep">·</span>' +
+              '<span class="reco-platform">' + f.platform + '</span>' +
             '</div>' +
-            '<div class="reco-hook">' + f.hook + '</div>' +
           '</div>' +
-          '<div class="reco-card-right">' +
-            '<div class="compat-score">' + f.compatScore + '<span class="compat-pct">%</span></div>' +
-            '<div class="compat-label">match</div>' +
-          '</div>' +
+          '<div class="reco-hook">' + f.hook + '</div>' +
         '</div>' +
-        '<div class="reco-card-actions">' +
-          '<button class="rca-btn rca-skip" onclick="event.stopPropagation();RecoActions.skip(' + i + ')" title="Pas intéressé">✕</button>' +
-          '<button class="rca-btn rca-save" onclick="event.stopPropagation();RecoActions.save(' + i + ')" title="Ajouter à ma liste">🔖</button>' +
-          '<button class="rca-btn rca-open" onclick="Detail.open(' + i + ')" title="Voir détail">→</button>' +
-        '</div>' +
-      '</div>'
-    ).join("");
+        '<div class="reco-card-right">' +
+          '<div class="compat-score">' + f.compatScore + '<span class="compat-pct">%</span></div>' +
+          '<div class="compat-label">match</div>' +
+        '</div>';
+
+      // Action bar
+      const actions = document.createElement("div");
+      actions.className = "reco-card-actions";
+
+      const skipBtn = document.createElement("button");
+      skipBtn.className = "rca-btn rca-skip";
+      skipBtn.title = "Pas intéressé";
+      skipBtn.innerHTML = "✕ Pas intéressé";
+      skipBtn.addEventListener("click", () => RecoActions.skip(i));
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "rca-btn rca-save";
+      saveBtn.id = "save-btn-" + i;
+      saveBtn.title = "À voir plus tard";
+      saveBtn.innerHTML = "🔖 À voir";
+      saveBtn.addEventListener("click", () => RecoActions.save(i, saveBtn));
+
+      const openBtn = document.createElement("button");
+      openBtn.className = "rca-btn rca-open";
+      openBtn.title = "Voir détail";
+      openBtn.innerHTML = "Détail →";
+      openBtn.addEventListener("click", () => Detail.open(i));
+
+      actions.appendChild(skipBtn);
+      actions.appendChild(saveBtn);
+      actions.appendChild(openBtn);
+      card.appendChild(inner);
+      card.appendChild(actions);
+      list.appendChild(card);
+    });
 
     // Load posters async
     recos.forEach(async (f, i) => {
@@ -600,14 +638,38 @@ window.Films = {
     Films.render();
     Films.updateStats();
   },
+  currentList() {
+    // Return the right film list based on active viewer
+    if (State.viewer === "alice") return State.aliceFilms;
+    if (State.viewer === "both") {
+      // Merge both lists, deduplicated by title
+      const combined = [...State.films];
+      State.aliceFilms.forEach(af => {
+        if (!combined.find(f => f.title.toLowerCase() === af.title.toLowerCase())) combined.push(af);
+      });
+      return combined;
+    }
+    return State.films;
+  },
+  async addForCurrentViewer(title, year, rating) {
+    if (State.viewer === "alice") {
+      await Alice.add(title, year, rating);
+    } else {
+      const id = await fbAddFilm(State.user.uid, { title, year, rating });
+      State.films.unshift({ id, title, year, rating });
+      Films.render();
+      Films.updateStats();
+      toast("Film ajouté !");
+    }
+  },
 
   filter(q) {
-    const filtered = State.films.filter(f => f.title.toLowerCase().includes(q.toLowerCase()));
+    const filtered = Films.currentList().filter(f => f.title.toLowerCase().includes(q.toLowerCase()));
     Films.renderList(filtered);
   },
 
   render() {
-    Films.renderList(State.films);
+    Films.renderList(Films.currentList());
     Films.updateStats();
   },
 
@@ -631,11 +693,12 @@ window.Films = {
   },
 
   updateStats() {
-    $("stat-total").textContent = State.films.length;
-    const rated = State.films.filter(f => f.rating > 0);
-    const avg   = rated.length ? rated.reduce((s, f) => s + f.rating, 0) / rated.length : 0;
+    const list = Films.currentList();
+    $("stat-total").textContent = list.length;
+    const rated = list.filter(f => f.rating > 0);
+    const avg = rated.length ? rated.reduce((s, f) => s + f.rating, 0) / rated.length : 0;
     $("stat-avg").textContent = avg ? avg.toFixed(1) + "★" : "—";
-    $("stat-fav").textContent = State.films.filter(f => f.rating >= 4).length;
+    $("stat-fav").textContent = list.filter(f => f.rating >= 4).length;
   },
 
   showAddForm()  { $("add-form").style.display = "flex"; $("new-title").focus(); },
@@ -653,9 +716,14 @@ window.Films = {
     const title = $("new-title").value.trim();
     const year  = $("new-year").value.trim();
     if (!title) return;
-    const id = await fbAddFilm(State.user.uid, { title, year, rating: State.addStar });
-    State.films.unshift({ id, title, year, rating: State.addStar });
+    if (State.viewer === "alice") {
+      await Alice.add(title, year, State.addStar);
+    } else {
+      const id = await fbAddFilm(State.user.uid, { title, year, rating: State.addStar });
+      State.films.unshift({ id, title, year, rating: State.addStar });
+    }
     Films.render();
+    Films.updateStats();
     $("new-title").value = "";
     $("new-year").value  = "";
     Films.hideAddForm();
@@ -663,22 +731,32 @@ window.Films = {
   },
 
   async markWatched(title, year, rating = 0) {
-    if (State.films.find(f => f.title.toLowerCase() === title.toLowerCase())) {
-      toast("Déjà dans ta liste !", "warn");
-      return;
+    const list = State.viewer === "alice" ? State.aliceFilms : State.films;
+    if (list.find(f => f.title.toLowerCase() === title.toLowerCase())) {
+      toast("Déjà dans ta liste !", "warn"); return;
     }
-    const id = await fbAddFilm(State.user.uid, { title, year: String(year), rating: rating || 0 });
-    State.films.unshift({ id, title, year: String(year), rating: rating || 0 });
-    Films.updateStats();
-    const ratingTxt = rating ? ` avec ${rating}★` : "";
-    toast(`"${title}" ajouté${ratingTxt} !`);
+    if (State.viewer === "alice") {
+      await Alice.add(title, String(year), rating || 0);
+    } else {
+      const id = await fbAddFilm(State.user.uid, { title, year: String(year), rating: rating || 0 });
+      State.films.unshift({ id, title, year: String(year), rating: rating || 0 });
+      Films.updateStats();
+    }
+    const ratingTxt = rating ? " avec " + rating + "★" : "";
+    toast('"' + title + '" ajouté' + ratingTxt + ' !');
     Detail.close();
   },
 
   async remove(id) {
-    await fbDeleteFilm(State.user.uid, id);
-    State.films = State.films.filter(f => f.id !== id);
+    if (State.viewer === "alice") {
+      await fbDeleteAliceFilm(State.user.uid, id);
+      State.aliceFilms = State.aliceFilms.filter(f => f.id !== id);
+    } else {
+      await fbDeleteFilm(State.user.uid, id);
+      State.films = State.films.filter(f => f.id !== id);
+    }
     Films.render();
+    Films.updateStats();
     toast("Film supprimé.");
   },
 
@@ -709,12 +787,18 @@ window.Films = {
       }
 
       if (!toAdd.length) { $("import-status").textContent = "Aucun nouveau film trouvé."; return; }
-      await fbBulkAddFilms(State.user.uid, toAdd);
-      State.films = await fbGetFilms(State.user.uid);
+      if (State.viewer === "alice") {
+        for (const f of toAdd) await fbAddAliceFilm(State.user.uid, f);
+        State.aliceFilms = await fbGetAliceFilms(State.user.uid);
+      } else {
+        await fbBulkAddFilms(State.user.uid, toAdd);
+        State.films = await fbGetFilms(State.user.uid);
+      }
       Films.render();
-      $("import-status").textContent = `✓ ${toAdd.length} films importés avec notes !`;
+      Films.updateStats();
+      $("import-status").textContent = "✓ " + toAdd.length + " films importés !";
       setTimeout(() => $("import-status").textContent = "", 4000);
-      toast(`${toAdd.length} films importés depuis Letterboxd !`);
+      toast(toAdd.length + " films importés depuis Letterboxd !");
     };
     reader.readAsText(file);
   }
@@ -815,10 +899,12 @@ window.Viewer = {
     // Update greeting
     const greet = $("viewer-greeting");
     if (greet) {
-      if (v === "adrien") greet.textContent = "Bonsoir Adrien 👋";
-      else if (v === "alice") greet.textContent = "Bonsoir Alice 🐱";
-      else greet.textContent = "Bonsoir vous deux 💑";
+      if (v === "adrien") greet.textContent = "◈ Bonsoir Adrien";
+      else if (v === "alice") greet.textContent = "🐱 Bonsoir Alice";
+      else greet.textContent = "◈ Bonsoir vous deux";
     }
+    // Update nav for this viewer
+    Nav.updateForViewer(v);
   }
 };
 
@@ -834,15 +920,11 @@ window.RecoActions = {
     }
     toast("Film ignoré");
   },
-  save(i) {
+  save(i, btn) {
     const f = Reco.current[i];
     if (!f) return;
-    Watchlist.add({ title: f.title, year: f.year, genre: f.genre, platform: f.platform, poster: null });
-    const card = document.getElementById("reco-card-" + i);
-    if (card) {
-      const btn = card.querySelector(".rca-save");
-      if (btn) { btn.textContent = "✓"; btn.style.color = "var(--accent)"; }
-    }
+    Watchlist.add({ title: f.title, year: f.year, genre: f.genre, platform: f.platform });
+    if (btn) { btn.innerHTML = "✓ Ajouté"; btn.style.color = "var(--accent)"; btn.disabled = true; }
   }
 };
 
@@ -851,7 +933,13 @@ window.Watchlist = {
   async load() {
     if (!State.user) return;
     State.watchlist = await fbGetWatchlist(State.user.uid);
+    // Alice's watchlist stored separately in profile
+    State.aliceWatchlist = State.profile && State.profile.aliceWatchlist ? State.profile.aliceWatchlist : [];
     Watchlist.render();
+  },
+  currentList() {
+    if (State.viewer === "alice") return State.aliceWatchlist || [];
+    return State.watchlist;
   },
   async add(film) {
     // Check not already in watchlist
@@ -888,7 +976,7 @@ window.Watchlist = {
     }
     // Build using DOM to avoid escaping issues
     el.innerHTML = "";
-    State.watchlist.forEach(f => {
+    wlList.forEach(f => {
       const badge = document.createElement("div");
       badge.className = "wl-badge";
       badge.id = "wl-" + f.id;
