@@ -319,25 +319,34 @@ PATTERNS DÉDUITS DE SES NOTES :
 - AIME : drames intenses et psychologiques, thrillers cérébraux, grands classiques (Kubrick, Scorsese, Coppola, Lynch, Kurosawa), cinéma d'auteur français (Varda, Demy, Melville), épopées ambitieuses (LOTR), biopics solides, polars, films de gangsters, westerns, films qui demandent de la réflexion
 - N'AIME PAS : MCU en général, comédies légères françaises bas de gamme, suites sans substance, films trop commerciaux sans profondeur
 
+DÉFINITION PRÉCISE DES AMBIANCES (RESPECTE-LES STRICTEMENT) :
+- "Détente" = films feel-good, drôles ou doux, zéro tension, zéro violence — ex: The Grand Budapest Hotel, Ratatouille, Chef, About Time
+- "Adrénaline" = action intense, thriller haletant, rythme rapide — ex: Heat, Mad Max, Mission Impossible
+- "Réflexion" = drame lent et contemplatif, film d'auteur, thèmes profonds — ex: Mulholland Drive, Parasite, Past Lives
+- "Rire" = comédie légère, humour franc, atmosphère détendue — ex: The Nice Guys, Game Night, Superbad
+- "Frissons" = horreur, suspense psychologique, angoisse — ex: Get Out, Hereditary, The Shining
+- "Aventure" = épopée, voyage, découverte, spectacle — ex: LOTR, Indiana Jones, Les Aventures de Tintin
+
+⚠️ Si l'ambiance demandée est "Détente" ou "Rire", NE PAS proposer de westerns, thrillers, films de guerre ou films sombres même si Adrien les aime habituellement. L'ambiance du soir PRIME sur les goûts habituels.
+
 CONTEXTE CE SOIR :
 - Mode : ${w.who === "chaton" ? "avec chaton (sa copine)" : "seul"}
-- Ambiance souhaitée : ${w.moods.length ? w.moods.join(", ") : "peu importe"}
+- Ambiance OBLIGATOIRE : ${w.moods.length ? w.moods.join(", ") : "peu importe — propose de la variété"}
 - Durée max : ${fmtDur(w.dur)}
 - Époque : ${w.epoch}
 - Envies particulières : ${w.extras.length ? w.extras.join(", ") : "aucune"}
 - Plateformes disponibles : ${(p.platforms || []).join(", ") || "Netflix, Prime Video, Canal+, Disney+, Apple TV+, OCS"}
 ${w.who === "chaton" ? "- Profil copine : aime les drames romantiques, feel-good, comédies accessibles — trouver le bon compromis pour deux" : ""}
-- Tous les films déjà vus (NE PAS recommander) : ${allSeen.length > 1000 ? allSeen.substring(0, 1000) + "..." : allSeen}
-${extra ? `- Demande spéciale : ${extra}` : ""}
+- Films déjà vus (NE PAS recommander) : ${allSeen.length > 800 ? allSeen.substring(0, 800) + "..." : allSeen}
+${extra ? "- Demande spéciale : " + extra : ""}
 
 RÈGLES ABSOLUES :
-1. Ne JAMAIS recommander un film déjà vu par Adrien
-2. Toujours justifier en citant un film qu'il a aimé ("Comme tu as adoré Whiplash..." ou "Dans la lignée de Parasite...")
-3. Jamais de MCU sauf demande explicite
-4. En mode couple : équilibrer ses goûts pointus avec quelque chose d'accessible pour deux
-5. Le score de compatibilité doit refléter réellement ses goûts (pas juste mettre 90+ partout)
-6. PRIME VIDEO : uniquement les films inclus dans l'abonnement Prime de base (pas location/achat). En cas de doute, indiquer Netflix ou Canal+ à la place.
-7. Ne JAMAIS recommander un film présent dans la liste des films déjà vus
+1. Ne JAMAIS recommander un film déjà vu
+2. RESPECTER L'AMBIANCE demandée — c'est la règle la plus importante
+3. Justifier en citant un film qu'il a aimé
+4. Jamais de MCU sauf demande explicite
+5. PRIME VIDEO : abonnement de base uniquement, pas de location
+6. Le score de compatibilité doit être honnête (pas tous 90+)
 
 Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau de 10 objets. Sois concis pour tenir dans les tokens :
 [
