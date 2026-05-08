@@ -2,15 +2,21 @@
 import {
   fbRegister, fbLogin, fbLogout, fbOnAuth,
   fbGetProfile, fbSaveProfile,
-  fbGetFilms, fbAddFilm, fbDeleteFilm, fbBulkAddFilms
+  fbGetFilms, fbAddFilm, fbDeleteFilm, fbBulkAddFilms,
+  fbGetWatchlist, fbAddToWatchlist, fbRemoveFromWatchlist,
+  fbGetAliceFilms, fbAddAliceFilm, fbDeleteAliceFilm
 } from "./firebase.js";
 
 // ─── ÉTAT GLOBAL ───────────────────────────────────────────────────────────────
 const State = {
-  user:     null,
-  profile:  null,
-  films:    [],
-  addStar:  0,
+  user:        null,
+  profile:     null,
+  films:       [],       // Adrien's watched films
+  watchlist:   [],       // À voir
+  aliceFilms:  [],       // Alice's watched films
+  viewer:      "adrien", // "adrien", "alice", or "both"
+  aliceAddStar: 0,
+  addStar:     0,
   wizard: {
     who:    "solo",
     moods:  [],
@@ -42,7 +48,7 @@ function fmtDur(min) {
   return m ? `${h}h${m}` : `${h}h`;
 }
 function getAPIKey() {
-  return localStorage.getItem("cinescope_apikey") || "";
+  return localStorage.getItem("cinescope_apikey") || (State.profile && State.profile.groqKey) || "";
 }
 function getTMDBKey() {
   // First check localStorage, then profile
@@ -173,12 +179,15 @@ window.Hero = {
 window.Nav = {
   goto(page, btn) {
     document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-    $(`page-${page}`).classList.add("active");
+    const pageEl = $("page-" + page);
+    if (pageEl) pageEl.classList.add("active");
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
     if (btn) btn.classList.add("active");
-    else document.querySelector(`.nav-btn[data-page="${page}"]`)?.classList.add("active");
+    else { const nb = document.querySelector('.nav-btn[data-page="' + page + '"]'); if (nb) nb.classList.add("active"); }
     if (page === "films") Films.render();
     if (page === "settings") Settings.syncUI();
+    if (page === "watchlist") Watchlist.render();
+    if (page === "alice") { Alice.render(); Alice.updateStats(); }
   }
 };
 
@@ -414,7 +423,7 @@ window.Reco = {
       '<span class="meta-tag">Max ' + fmtDur(w.dur) + '</span>';
 
     $("reco-list").innerHTML = recos.map((f, i) =>
-      '<div class="reco-card" onclick="Detail.open(' + i + ')">' +
+      '<div class="reco-card" id="reco-card-' + i + '">' +
         '<div class="reco-card-inner">' +
           '<div class="reco-poster" id="poster-wrap-' + i + '">' +
             '<div class="reco-poster-placeholder">🎬</div>' +
@@ -435,8 +444,12 @@ window.Reco = {
           '<div class="reco-card-right">' +
             '<div class="compat-score">' + f.compatScore + '<span class="compat-pct">%</span></div>' +
             '<div class="compat-label">match</div>' +
-            '<div class="reco-arrow">→</div>' +
           '</div>' +
+        '</div>' +
+        '<div class="reco-card-actions">' +
+          '<button class="rca-btn rca-skip" onclick="event.stopPropagation();RecoActions.skip(' + i + ')" title="Pas intéressé">✕</button>' +
+          '<button class="rca-btn rca-save" onclick="event.stopPropagation();RecoActions.save(' + i + ')" title="Ajouter à ma liste">🔖</button>' +
+          '<button class="rca-btn rca-open" onclick="Detail.open(' + i + ')" title="Voir détail">→</button>' +
         '</div>' +
       '</div>'
     ).join("");
@@ -724,6 +737,9 @@ window.Settings = {
       btn.classList.toggle("active", (p.gfGenres || []).includes(btn.dataset.g));
     });
     $("user-email-display").textContent = State.user?.email || "";
+    if (State.profile && State.profile.groqKey) {
+      localStorage.setItem("cinescope_apikey", State.profile.groqKey);
+    }
     $("api-key-input").value = getAPIKey() ? "••••••••••••••••" : "";
     // Load TMDB key from Firebase into localStorage
     if (State.profile && State.profile.tmdbKey) {
@@ -754,10 +770,12 @@ window.Settings = {
     toast("Profil de ta copine sauvegardé !");
   },
 
-  saveAPIKey() {
+  async saveAPIKey() {
     const val = $("api-key-input").value.trim();
     if (val && !val.startsWith("•")) {
       localStorage.setItem("cinescope_apikey", val);
+      await fbSaveProfile(State.user.uid, { groqKey: val });
+      if (State.profile) State.profile.groqKey = val;
       toast("Clé API Groq sauvegardée !");
       $("api-key-input").value = "••••••••••••••••";
     }
@@ -776,6 +794,213 @@ window.Settings = {
   }
 };
 
+// ─── VIEWER SELECTION ─────────────────────────────────────────────────────────
+window.Viewer = {
+  set(v) {
+    State.viewer = v;
+    // Update wizard who
+    if (v === "both") {
+      State.wizard.who = "chaton";
+      document.querySelectorAll(".who-card").forEach(c => c.classList.remove("active"));
+      const chatonCard = document.getElementById("who-chaton");
+      if (chatonCard) chatonCard.classList.add("active");
+    } else {
+      State.wizard.who = "solo";
+      document.querySelectorAll(".who-card").forEach(c => c.classList.remove("active"));
+      const soloCard = document.getElementById("who-solo");
+      if (soloCard) soloCard.classList.add("active");
+    }
+    showScreen("app");
+    Nav.goto("reco");
+    // Update greeting
+    const greet = $("viewer-greeting");
+    if (greet) {
+      if (v === "adrien") greet.textContent = "Bonsoir Adrien 👋";
+      else if (v === "alice") greet.textContent = "Bonsoir Alice 🐱";
+      else greet.textContent = "Bonsoir vous deux 💑";
+    }
+  }
+};
+
+// ─── RECO ACTIONS ─────────────────────────────────────────────────────────────
+window.RecoActions = {
+  skip(i) {
+    const card = document.getElementById("reco-card-" + i);
+    if (card) {
+      card.style.transition = "all .3s ease";
+      card.style.opacity = "0";
+      card.style.transform = "translateX(-20px)";
+      setTimeout(() => card.remove(), 300);
+    }
+    toast("Film ignoré");
+  },
+  save(i) {
+    const f = Reco.current[i];
+    if (!f) return;
+    Watchlist.add({ title: f.title, year: f.year, genre: f.genre, platform: f.platform, poster: null });
+    const card = document.getElementById("reco-card-" + i);
+    if (card) {
+      const btn = card.querySelector(".rca-save");
+      if (btn) { btn.textContent = "✓"; btn.style.color = "var(--accent)"; }
+    }
+  }
+};
+
+// ─── WATCHLIST ─────────────────────────────────────────────────────────────────
+window.Watchlist = {
+  async load() {
+    if (!State.user) return;
+    State.watchlist = await fbGetWatchlist(State.user.uid);
+    Watchlist.render();
+  },
+  async add(film) {
+    // Check not already in watchlist
+    if (State.watchlist.find(f => f.title.toLowerCase() === film.title.toLowerCase())) {
+      toast('"' + film.title + '" est déjà dans ta liste !', "warn");
+      return;
+    }
+    const id = await fbAddToWatchlist(State.user.uid, film);
+    State.watchlist.unshift({ id, ...film });
+    Watchlist.render();
+    toast('🔖 Ajouté à ta liste !');
+  },
+  async remove(id) {
+    await fbRemoveFromWatchlist(State.user.uid, id);
+    State.watchlist = State.watchlist.filter(f => f.id !== id);
+    Watchlist.render();
+    toast('Retiré de ta liste.');
+  },
+  async markWatched(film) {
+    // Add to seen films with rating 0 and remove from watchlist
+    await Films.markWatched(film.title, film.year, 0);
+    await Watchlist.remove(film.id);
+  },
+  render() {
+    const el = $("watchlist-grid");
+    if (!el) return;
+    $("watchlist-count").textContent = State.watchlist.length;
+    if (!State.watchlist.length) {
+      el.innerHTML = '<p class="empty-state">Ta liste est vide.<br>Ajoute des films depuis les recommandations !</p>';
+      return;
+    }
+    el.innerHTML = State.watchlist.map(f =>
+      '<div class="wl-badge" id="wl-' + f.id + '">' +
+        '<div class="wl-poster" id="wl-poster-' + f.id + '">' +
+          '<div class="wl-poster-placeholder">🎬</div>' +
+        '</div>' +
+        '<div class="wl-info">' +
+          '<div class="wl-title">' + f.title + '</div>' +
+          '<div class="wl-year">' + (f.year || "") + ' · ' + (f.platform || "") + '</div>' +
+        '</div>' +
+        '<div class="wl-actions">' +
+          '<button class="wl-btn wl-seen" onclick="Watchlist.markWatched(' + JSON.stringify(f).replace(/"/g,"'") + ')" title="Marquer vu">✓</button>' +
+          '<button class="wl-btn wl-del" onclick="Watchlist.remove('' + f.id + '')" title="Retirer">✕</button>' +
+        '</div>' +
+      '</div>'
+    ).join("");
+
+    // Load posters
+    State.watchlist.forEach(async f => {
+      const poster = await fetchPoster(f.title, f.year);
+      const wrap = document.getElementById("wl-poster-" + f.id);
+      if (wrap && poster) {
+        wrap.innerHTML = '<img src="' + poster + '" alt="' + f.title + '" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:8px">';
+      }
+    });
+  }
+};
+
+// ─── ALICE ─────────────────────────────────────────────────────────────────────
+window.Alice = {
+  async load() {
+    if (!State.user) return;
+    State.aliceFilms = await fbGetAliceFilms(State.user.uid);
+    Alice.render();
+  },
+  async add(title, year, rating) {
+    if (State.aliceFilms.find(f => f.title.toLowerCase() === title.toLowerCase())) {
+      toast('Déjà dans la liste d'Alice !', "warn"); return;
+    }
+    const id = await fbAddAliceFilm(State.user.uid, { title, year, rating: rating || 0 });
+    State.aliceFilms.unshift({ id, title, year, rating: rating || 0 });
+    Alice.render();
+    Alice.updateStats();
+  },
+  async remove(id) {
+    await fbDeleteAliceFilm(State.user.uid, id);
+    State.aliceFilms = State.aliceFilms.filter(f => f.id !== id);
+    Alice.render();
+    Alice.updateStats();
+  },
+  setStar(n) {
+    State.aliceAddStar = n;
+    document.querySelectorAll("#alice-star-input .star-btn").forEach((b, i) => b.classList.toggle("lit", i < n));
+  },
+  render() {
+    const el = $("alice-film-list");
+    if (!el) return;
+    if (!State.aliceFilms.length) {
+      el.innerHTML = '<p class="empty-state">Aucun film d'Alice.<br>Importe son CSV Letterboxd ou ajoute manuellement.</p>';
+      return;
+    }
+    el.innerHTML = State.aliceFilms.map(f =>
+      '<div class="film-row">' +
+        '<div class="film-info">' +
+          '<div class="film-title">' + f.title + '</div>' +
+          '<div class="film-year">' + (f.year || "") + '</div>' +
+        '</div>' +
+        '<div class="film-row-right">' +
+          '<div class="film-stars">' + starsHtml(f.rating || 0) + '</div>' +
+          '<button class="del-btn" onclick="Alice.remove('' + f.id + '')">✕</button>' +
+        '</div>' +
+      '</div>'
+    ).join("");
+  },
+  updateStats() {
+    const el = $("alice-stat-total");
+    if (el) el.textContent = State.aliceFilms.length;
+    const rated = State.aliceFilms.filter(f => f.rating > 0);
+    const avg = rated.length ? rated.reduce((s, f) => s + f.rating, 0) / rated.length : 0;
+    const avgEl = $("alice-stat-avg");
+    if (avgEl) avgEl.textContent = avg ? avg.toFixed(1) + "★" : "—";
+    const favEl = $("alice-stat-fav");
+    if (favEl) favEl.textContent = State.aliceFilms.filter(f => f.rating >= 4).length;
+  },
+  importCSV(input) {
+    const file = input.files[0];
+    if (!file) return;
+    $("alice-import-status").textContent = "Import en cours…";
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const lines = e.target.result.split("\n");
+      const header = lines[0].toLowerCase().split(",");
+      const nameIdx = header.findIndex(h => h.trim().includes("name"));
+      const yearIdx = header.findIndex(h => h.trim().includes("year"));
+      const ratingIdx = header.findIndex(h => h.trim() === "rating");
+      const toAdd = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+        const clean = cols.map(c => c.replace(/^"|"$/g, "").trim());
+        const title = clean[nameIdx];
+        if (!title) continue;
+        if (State.aliceFilms.find(f => f.title.toLowerCase() === title.toLowerCase())) continue;
+        const year = clean[yearIdx] || "";
+        const raw = ratingIdx >= 0 ? parseFloat(clean[ratingIdx]) : 0;
+        const rating = isNaN(raw) ? 0 : raw;
+        toAdd.push({ title, year, rating });
+      }
+      if (!toAdd.length) { $("alice-import-status").textContent = "Aucun nouveau film."; return; }
+      for (const f of toAdd) await fbAddAliceFilm(State.user.uid, f);
+      State.aliceFilms = await fbGetAliceFilms(State.user.uid);
+      Alice.render();
+      Alice.updateStats();
+      $("alice-import-status").textContent = "✓ " + toAdd.length + " films importés !";
+      setTimeout(() => $("alice-import-status").textContent = "", 4000);
+    };
+    reader.readAsText(file);
+  }
+};
+
 // ─── BOOT ──────────────────────────────────────────────────────────────────────
 fbOnAuth(async (user) => {
   if (!user) {
@@ -790,8 +1015,20 @@ fbOnAuth(async (user) => {
     return;
   }
 
-  await Films.load();
+  // Load all data in parallel
+  await Promise.all([
+    Films.load(),
+    Watchlist.load(),
+    Alice.load()
+  ]);
+
+  // Load TMDB key from Firebase
+  if (State.profile && State.profile.tmdbKey) {
+    localStorage.setItem("cinescope_tmdbkey", State.profile.tmdbKey);
+  }
+
   Settings.syncUI();
-  showScreen("app");
-  Nav.goto("reco");
+
+  // Show viewer selector
+  showScreen("viewer-select");
 });
