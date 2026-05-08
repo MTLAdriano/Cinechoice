@@ -47,39 +47,33 @@ function getAPIKey() {
 function getTMDBKey() {
   return localStorage.getItem("cinescope_tmdbkey") || "74161f0d7da9c0be2ec68049de45e9e7";
 }
-async function fetchPoster(title, year) {
+async function tmdbSearch(title, year) {
   const key = getTMDBKey();
   if (!key) return null;
   try {
     const q = encodeURIComponent(title);
-    const url = `https://api.themoviedb.org/3/search/movie?api_key=${key}&query=${q}&year=${year}&language=fr-FR`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.results && data.results[0] && data.results[0].poster_path) {
-      return `https://image.tmdb.org/t/p/w300${data.results[0].poster_path}`;
-    }
-    // fallback without year
-    const url2 = `https://api.themoviedb.org/3/search/movie?api_key=${key}&query=${q}&language=fr-FR`;
-    const res2 = await fetch(url2);
-    const data2 = await res2.json();
-    if (data2.results && data2.results[0] && data2.results[0].poster_path) {
-      return `https://image.tmdb.org/t/p/w300${data2.results[0].poster_path}`;
-    }
-  } catch(e) {}
+    // Try with year first (en-US for best poster coverage)
+    let url = `https://api.themoviedb.org/3/search/movie?api_key=${key}&query=${q}&year=${year}&language=en-US`;
+    let res = await fetch(url);
+    let data = await res.json();
+    if (data.results && data.results.length > 0) return data.results[0];
+    // Fallback without year
+    url = `https://api.themoviedb.org/3/search/movie?api_key=${key}&query=${q}&language=en-US`;
+    res = await fetch(url);
+    data = await res.json();
+    if (data.results && data.results.length > 0) return data.results[0];
+  } catch(e) { console.error("TMDB search error:", e); }
+  return null;
+}
+async function fetchPoster(title, year) {
+  const movie = await tmdbSearch(title, year);
+  if (movie && movie.poster_path) return `https://image.tmdb.org/t/p/w342${movie.poster_path}`;
   return null;
 }
 async function fetchBackdrop(title, year) {
-  const key = getTMDBKey();
-  if (!key) return null;
-  try {
-    const q = encodeURIComponent(title);
-    const url = `https://api.themoviedb.org/3/search/movie?api_key=${key}&query=${q}&year=${year}&language=fr-FR`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.results && data.results[0] && data.results[0].backdrop_path) {
-      return `https://image.tmdb.org/t/p/w780${data.results[0].backdrop_path}`;
-    }
-  } catch(e) {}
+  const movie = await tmdbSearch(title, year);
+  if (movie && movie.backdrop_path) return `https://image.tmdb.org/t/p/w780${movie.backdrop_path}`;
+  if (movie && movie.poster_path) return `https://image.tmdb.org/t/p/w780${movie.poster_path}`;
   return null;
 }
 
