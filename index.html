@@ -138,6 +138,25 @@
 
     <!-- RECO PAGE -->
     <div id="page-reco" class="page active">
+      <!-- HERO — dernière reco -->
+      <div id="hero-section" style="display:none">
+        <div class="hero" id="hero-card" onclick="Hero.open()">
+          <div id="hero-img-wrap">
+            <div class="hero-placeholder">🎬</div>
+          </div>
+          <div class="hero-gradient"></div>
+          <div class="hero-content">
+            <div class="hero-badge">✦ Dernière recommandation</div>
+            <div class="hero-title" id="hero-title">—</div>
+            <div class="hero-meta" id="hero-meta">—</div>
+            <button class="hero-btn" onclick="event.stopPropagation();Wizard.reset()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Nouvelle soirée
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div id="wizard-container">
         <header class="page-header">
           <span class="logo-sm">◈ CinéScope</span>
@@ -155,9 +174,9 @@
                 <div class="who-icon">◎</div>
                 <div class="who-label">Seul</div>
               </div>
-              <div class="who-card" id="who-couple" onclick="Wizard.setWho('couple', this)">
+              <div class="who-card" id="who-chaton" onclick="Wizard.setWho('chaton', this)">
                 <div class="who-icon">◉</div>
-                <div class="who-label">En couple</div>
+                <div class="who-label">Avec chaton</div>
               </div>
             </div>
             <button class="btn-full" onclick="Wizard.goTo(2)">Suivant</button>
@@ -277,7 +296,10 @@
           <span class="logo-sm">◈ Ce soir</span>
           <button class="btn-text-sm" onclick="Wizard.reset()">Recommencer</button>
         </header>
-        <div class="results-meta" id="results-meta"></div>
+        <div class="results-header">
+          <span class="results-title">Pour ce soir</span>
+          <div class="results-meta" id="results-meta"></div>
+        </div>
         <div id="reco-list" class="reco-list"></div>
         <div class="results-footer">
           <button class="btn-sec-full" onclick="AI.moreRecos()">Voir plus de suggestions →</button>
@@ -388,7 +410,7 @@
       </div>
 
       <div class="settings-section">
-        <div class="settings-title">Profil de ma copine</div>
+        <div class="settings-title">Profil de chaton 🐱</div>
         <div class="genre-grid" id="settings-gf">
           <div class="genre-btn" data-g="Feel-good">Feel-good</div>
           <div class="genre-btn" data-g="Comédie romantique">Comédie romantique</div>
