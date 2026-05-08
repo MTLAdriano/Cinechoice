@@ -245,7 +245,7 @@ window.Wizard = {
     $("reco-results").style.display     = "none";
     $("film-detail").style.display      = "none";
     $("hero-section").style.display     = "none";
-    if (window.RecoActions) RecoActions._queue = [];
+    if (window.Reco) { Reco._reserve = []; Reco.current = []; }
     this.goTo(1);
   },
   async launch() {
@@ -339,7 +339,7 @@ RÈGLES ABSOLUES :
 6. PRIME VIDEO : uniquement les films inclus dans l'abonnement Prime de base (pas location/achat). En cas de doute, indiquer Netflix ou Canal+ à la place.
 7. Ne JAMAIS recommander un film présent dans la liste des films déjà vus
 
-Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau de 3 objets :
+Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau de 10 objets variés :
 [
   {
     "title": "Titre exact du film",
@@ -423,8 +423,12 @@ Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau
 
 // ─── RECO RENDER ───────────────────────────────────────────────────────────────
 window.Reco = {
-  current: [],
+  current: [],    // 3 currently displayed
+  _reserve: [],   // remaining films in reserve
   async render(recos) {
+    // First 3 displayed, rest go to reserve
+    Reco._reserve = recos.slice(3);
+    recos = recos.slice(0, 3);
     Reco.current = recos;
     const w = State.wizard;
     $("results-meta").innerHTML =
@@ -492,9 +496,6 @@ window.Reco = {
       card.appendChild(actions);
       list.appendChild(card);
     });
-
-    // Prefetch extra recos in background
-    setTimeout(() => RecoActions._prefetch(), 2000);
 
     // Load posters async
     recos.forEach(async (f, i) => {
@@ -914,46 +915,36 @@ window.Viewer = {
 
 // ─── RECO ACTIONS ─────────────────────────────────────────────────────────────
 window.RecoActions = {
-  // Queue of extra recos fetched in background
-  _queue: [],
-  async _prefetch() {
-    if (RecoActions._queue.length > 0) return;
-    try {
-      const extras = await AI.getRecos("Propose 3 films différents des précédents, variés.");
-      RecoActions._queue.push(...extras);
-    } catch(e) {}
-  },
 
-  async _replaceCard(i, action) {
+  async _replaceCard(i, direction) {
     const card = document.getElementById("reco-card-" + i);
     if (!card) return;
 
+    // Get next from reserve
+    const next = Reco._reserve.shift();
+
     // Animate out
-    card.style.transition = "all .25s ease";
+    card.style.transition = "all .22s ease";
     card.style.opacity = "0";
-    card.style.transform = "translateX(" + (action === "skip" ? "-" : "") + "30px)";
+    card.style.transform = "translateX(" + (direction === "left" ? "-40px" : "40px") + ") scale(0.97)";
+    await new Promise(r => setTimeout(r, 220));
 
-    // Prefetch if queue empty
-    RecoActions._prefetch();
-
-    await new Promise(r => setTimeout(r, 250));
-
-    // Get next film from queue
-    const next = RecoActions._queue.shift();
     if (!next) {
       card.remove();
-      // Check if list is empty
       if ($("reco-list") && $("reco-list").children.length === 0) {
-        $("reco-list").innerHTML = '<p class="empty-state" style="padding:2rem;text-align:center">Plus de suggestions !<br><button class="btn-sm" style="margin-top:12px" onclick="Wizard.reset()">Nouvelle recherche</button></p>';
+        $("reco-list").innerHTML =
+          '<div style="text-align:center;padding:2.5rem 1rem">' +
+          '<p style="color:var(--text2);margin-bottom:1rem">Tu as tout passé en revue !</p>' +
+          '<button class="btn-full" style="max-width:200px;margin:0 auto" onclick="Wizard.reset()">Nouvelle recherche</button>' +
+          '</div>';
       }
       return;
     }
 
-    // Add to Reco.current
+    // Update Reco.current
     Reco.current[i] = next;
 
-    // Build new card content
-    const inner = card.querySelector(".reco-card-inner");
+    // Update card content
     const posterWrap = card.querySelector(".reco-poster");
     if (posterWrap) {
       posterWrap.id = "poster-wrap-" + i;
@@ -970,20 +961,18 @@ window.RecoActions = {
     if (hookEl) hookEl.textContent = next.hook;
     const scoreEl = card.querySelector(".compat-score");
     if (scoreEl) scoreEl.innerHTML = next.compatScore + '<span class="compat-pct">%</span>';
-
-    // Animate in
-    card.style.opacity = "0";
-    card.style.transform = "translateX(30px)";
-    card.style.transition = "all .25s ease";
-    await new Promise(r => setTimeout(r, 20));
-    card.style.opacity = "1";
-    card.style.transform = "translateX(0)";
-
-    // Reset save button
     const saveBtn = card.querySelector(".rca-save");
     if (saveBtn) { saveBtn.innerHTML = "🔖 À voir"; saveBtn.disabled = false; saveBtn.style.color = ""; }
 
-    // Load new poster
+    // Animate in from opposite side
+    card.style.transform = "translateX(" + (direction === "left" ? "40px" : "-40px") + ") scale(0.97)";
+    card.style.opacity = "0";
+    await new Promise(r => setTimeout(r, 20));
+    card.style.transition = "all .22s ease";
+    card.style.opacity = "1";
+    card.style.transform = "translateX(0) scale(1)";
+
+    // Load poster
     fetchPoster(next.title, next.year).then(poster => {
       const wrap = document.getElementById("poster-wrap-" + i);
       if (wrap && poster) {
@@ -998,8 +987,8 @@ window.RecoActions = {
   },
 
   async skip(i) {
-    toast("Film ignoré");
-    await RecoActions._replaceCard(i, "skip");
+    toast("⏭ Film ignoré");
+    RecoActions._replaceCard(i, "left");
   },
 
   async save(i, btn) {
@@ -1007,8 +996,7 @@ window.RecoActions = {
     if (!f) return;
     Watchlist.add({ title: f.title, year: f.year, genre: f.genre, platform: f.platform });
     if (btn) { btn.innerHTML = "✓ Ajouté"; btn.style.color = "var(--accent)"; btn.disabled = true; }
-    // Slide out and replace after short delay
-    setTimeout(() => RecoActions._replaceCard(i, "save"), 600);
+    setTimeout(() => RecoActions._replaceCard(i, "right"), 500);
   }
 };
 
