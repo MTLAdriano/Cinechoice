@@ -245,6 +245,7 @@ window.Wizard = {
     $("reco-results").style.display     = "none";
     $("film-detail").style.display      = "none";
     $("hero-section").style.display     = "none";
+    if (window.RecoActions) RecoActions._queue = [];
     this.goTo(1);
   },
   async launch() {
@@ -491,6 +492,9 @@ window.Reco = {
       card.appendChild(actions);
       list.appendChild(card);
     });
+
+    // Prefetch extra recos in background
+    setTimeout(() => RecoActions._prefetch(), 2000);
 
     // Load posters async
     recos.forEach(async (f, i) => {
@@ -910,21 +914,101 @@ window.Viewer = {
 
 // ─── RECO ACTIONS ─────────────────────────────────────────────────────────────
 window.RecoActions = {
-  skip(i) {
-    const card = document.getElementById("reco-card-" + i);
-    if (card) {
-      card.style.transition = "all .3s ease";
-      card.style.opacity = "0";
-      card.style.transform = "translateX(-20px)";
-      setTimeout(() => card.remove(), 300);
-    }
-    toast("Film ignoré");
+  // Queue of extra recos fetched in background
+  _queue: [],
+  async _prefetch() {
+    if (RecoActions._queue.length > 0) return;
+    try {
+      const extras = await AI.getRecos("Propose 3 films différents des précédents, variés.");
+      RecoActions._queue.push(...extras);
+    } catch(e) {}
   },
-  save(i, btn) {
+
+  async _replaceCard(i, action) {
+    const card = document.getElementById("reco-card-" + i);
+    if (!card) return;
+
+    // Animate out
+    card.style.transition = "all .25s ease";
+    card.style.opacity = "0";
+    card.style.transform = "translateX(" + (action === "skip" ? "-" : "") + "30px)";
+
+    // Prefetch if queue empty
+    RecoActions._prefetch();
+
+    await new Promise(r => setTimeout(r, 250));
+
+    // Get next film from queue
+    const next = RecoActions._queue.shift();
+    if (!next) {
+      card.remove();
+      // Check if list is empty
+      if ($("reco-list") && $("reco-list").children.length === 0) {
+        $("reco-list").innerHTML = '<p class="empty-state" style="padding:2rem;text-align:center">Plus de suggestions !<br><button class="btn-sm" style="margin-top:12px" onclick="Wizard.reset()">Nouvelle recherche</button></p>';
+      }
+      return;
+    }
+
+    // Add to Reco.current
+    Reco.current[i] = next;
+
+    // Build new card content
+    const inner = card.querySelector(".reco-card-inner");
+    const posterWrap = card.querySelector(".reco-poster");
+    if (posterWrap) {
+      posterWrap.id = "poster-wrap-" + i;
+      posterWrap.innerHTML = '<div class="reco-poster-placeholder">🎬</div>';
+    }
+    const titleEl = card.querySelector(".reco-title");
+    if (titleEl) titleEl.innerHTML = next.title + ' <span class="reco-year">' + next.year + '</span>';
+    const metaEl = card.querySelector(".reco-meta-row");
+    if (metaEl) metaEl.innerHTML =
+      '<span>' + next.genre + '</span><span class="reco-sep">·</span>' +
+      '<span>' + fmtDur(next.duration) + '</span><span class="reco-sep">·</span>' +
+      '<span class="reco-platform">' + next.platform + '</span>';
+    const hookEl = card.querySelector(".reco-hook");
+    if (hookEl) hookEl.textContent = next.hook;
+    const scoreEl = card.querySelector(".compat-score");
+    if (scoreEl) scoreEl.innerHTML = next.compatScore + '<span class="compat-pct">%</span>';
+
+    // Animate in
+    card.style.opacity = "0";
+    card.style.transform = "translateX(30px)";
+    card.style.transition = "all .25s ease";
+    await new Promise(r => setTimeout(r, 20));
+    card.style.opacity = "1";
+    card.style.transform = "translateX(0)";
+
+    // Reset save button
+    const saveBtn = card.querySelector(".rca-save");
+    if (saveBtn) { saveBtn.innerHTML = "🔖 À voir"; saveBtn.disabled = false; saveBtn.style.color = ""; }
+
+    // Load new poster
+    fetchPoster(next.title, next.year).then(poster => {
+      const wrap = document.getElementById("poster-wrap-" + i);
+      if (wrap && poster) {
+        const img = document.createElement("img");
+        img.src = poster;
+        img.alt = next.title;
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block";
+        wrap.innerHTML = "";
+        wrap.appendChild(img);
+      }
+    });
+  },
+
+  async skip(i) {
+    toast("Film ignoré");
+    await RecoActions._replaceCard(i, "skip");
+  },
+
+  async save(i, btn) {
     const f = Reco.current[i];
     if (!f) return;
     Watchlist.add({ title: f.title, year: f.year, genre: f.genre, platform: f.platform });
     if (btn) { btn.innerHTML = "✓ Ajouté"; btn.style.color = "var(--accent)"; btn.disabled = true; }
+    // Slide out and replace after short delay
+    setTimeout(() => RecoActions._replaceCard(i, "save"), 600);
   }
 };
 
