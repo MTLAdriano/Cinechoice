@@ -213,52 +213,48 @@ window.AI = {
     const seenTitles = State.films.map(f => f.title).join(", ") || "aucun encore";
     const topRated   = State.films.filter(f => f.rating >= 4).map(f => `${f.title} (${f.rating}★)`).slice(0, 15).join(", ") || "aucun encore";
 
-    const ADRIEN_TOP = [
-      "12 Angry Men (5★)", "Parasite (5★)", "Whiplash (5★)", "Taxi Driver (5★)",
-      "The Godfather (5★)", "In the Mood for Love (5★)", "The Lord of the Rings: The Two Towers (5★)",
-      "Good Will Hunting (4.5★)", "Past Lives (4.5★)", "The Matrix (4.5★)",
-      "Dead Poets Society (4.5★)", "The Grand Budapest Hotel (4.5★)", "The Dark Knight (4.5★)",
-      "Mulholland Drive (4.5★)", "All of Us Strangers (4.5★)", "The Elephant Man (4.5★)",
-      "Scarface (4.5★)", "Million Dollar Baby (4.5★)", "Gran Torino (4.5★)",
-      "Se7en (4.5★)", "Gladiator (4.5★)", "GoodFellas (4.5★)", "Incendies (4.5★)",
-      "Le Bonheur (4.5★)", "The Good the Bad and the Ugly (4.5★)", "The Blues Brothers (4.5★)",
-      "La La Land (4.5★)", "Le Samouraï (4.5★)", "The Umbrellas of Cherbourg (4.5★)"
-    ].join(", ");
+    // Build dynamic ratings from Firebase
+    const allRated   = State.films.filter(f => f.rating > 0).sort((a,b) => b.rating - a.rating);
+    const loved      = allRated.filter(f => f.rating >= 4.5).map(f => `${f.title} (${f.rating}★)`).join(", ");
+    const liked      = allRated.filter(f => f.rating >= 3.5 && f.rating < 4.5).map(f => `${f.title} (${f.rating}★)`).slice(0, 30).join(", ");
+    const disliked   = allRated.filter(f => f.rating <= 2).map(f => `${f.title} (${f.rating}★)`).join(", ");
+    const allSeen    = State.films.map(f => f.title).join(", ");
 
-    const ADRIEN_HATES = [
-      "Glass Onion (1★)", "Wonder Woman 1984 (1★)", "Fifty Shades of Grey (1★)",
-      "Fifty Shades Darker (1★)", "Mean Girls (1.5★)", "Black Widow (1.5★)",
-      "Star Wars Rise of Skywalker (1.5★)", "Presidents (0.5★)"
-    ].join(", ");
+    // Fallback hardcoded if Firebase empty
+    const topFallback = "12 Angry Men (5★), Parasite (5★), Whiplash (5★), Taxi Driver (5★), The Godfather (5★), In the Mood for Love (5★), Good Will Hunting (4.5★), Past Lives (4.5★), The Dark Knight (4.5★), Mulholland Drive (4.5★), Se7en (4.5★), GoodFellas (4.5★), Incendies (4.5★), La La Land (4.5★)";
+    const hatesFallback = "Glass Onion (1★), Wonder Woman 1984 (1★), Fifty Shades of Grey (1★), Mean Girls (1.5★), Black Widow (1.5★)";
 
     const prompt = `Tu es un expert en cinéma qui recommande des films à Adrien (AdrianoB23_ sur Letterboxd).
 
-PROFIL RÉEL D'ADRIEN (extrait de son vrai historique Letterboxd) :
+HISTORIQUE COMPLET D'ADRIEN (ses vraies notes Letterboxd) :
 
-Films qu'il adore (4.5-5★) : ${ADRIEN_TOP}
+Films adorés (4.5-5★) : ${loved || topFallback}
 
-Films qu'il déteste (à ne JAMAIS imiter) : ${ADRIEN_HATES}
+Films appréciés (3.5-4★) : ${liked || "non disponible"}
 
-PATTERNS IDENTIFIÉS :
-- AIME : drames intenses et psychologiques, thrillers cérébraux, grands classiques (Kubrick, Scorsese, Coppola, Lynch), cinéma d'auteur français (Varda, Demy, Melville), épopées ambitieuses (LOTR), films qui demandent de la réflexion, biopics solides, polars, films de gangsters, westerns
-- N'AIME PAS : MCU en général (notes systématiquement basses 1.5-2★), comédies légères françaises bas de gamme, suites sans substance, films trop commerciaux
+Films détestés (≤2★, à ne JAMAIS recommander de similaires) : ${disliked || hatesFallback}
+
+PATTERNS DÉDUITS DE SES NOTES :
+- AIME : drames intenses et psychologiques, thrillers cérébraux, grands classiques (Kubrick, Scorsese, Coppola, Lynch, Kurosawa), cinéma d'auteur français (Varda, Demy, Melville), épopées ambitieuses (LOTR), biopics solides, polars, films de gangsters, westerns, films qui demandent de la réflexion
+- N'AIME PAS : MCU en général, comédies légères françaises bas de gamme, suites sans substance, films trop commerciaux sans profondeur
 
 CONTEXTE CE SOIR :
 - Mode : ${w.who === "couple" ? "en couple avec sa copine" : "seul"}
-- Ambiance : ${w.moods.length ? w.moods.join(", ") : "peu importe"}
+- Ambiance souhaitée : ${w.moods.length ? w.moods.join(", ") : "peu importe"}
 - Durée max : ${fmtDur(w.dur)}
 - Époque : ${w.epoch}
-- Envies : ${w.extras.length ? w.extras.join(", ") : "aucune"}
-- Plateformes : ${(p.platforms || []).join(", ") || "Netflix, Prime Video, Canal+, Disney+, Apple TV+, OCS"}
-${w.who === "couple" ? "- Copine aime : drames romantiques, feel-good, comédies accessibles — trouver le bon compromis" : ""}
-- Films déjà vus (NE PAS recommander) : ${seenTitles.length > 800 ? seenTitles.substring(0, 800) + "..." : seenTitles}
+- Envies particulières : ${w.extras.length ? w.extras.join(", ") : "aucune"}
+- Plateformes disponibles : ${(p.platforms || []).join(", ") || "Netflix, Prime Video, Canal+, Disney+, Apple TV+, OCS"}
+${w.who === "couple" ? "- Profil copine : aime les drames romantiques, feel-good, comédies accessibles — trouver le bon compromis pour deux" : ""}
+- Tous les films déjà vus (NE PAS recommander) : ${allSeen.length > 1000 ? allSeen.substring(0, 1000) + "..." : allSeen}
 ${extra ? `- Demande spéciale : ${extra}` : ""}
 
-RÈGLES :
-1. Ne JAMAIS recommander un film déjà vu
+RÈGLES ABSOLUES :
+1. Ne JAMAIS recommander un film déjà vu par Adrien
 2. Toujours justifier en citant un film qu'il a aimé ("Comme tu as adoré Whiplash..." ou "Dans la lignée de Parasite...")
 3. Jamais de MCU sauf demande explicite
 4. En mode couple : équilibrer ses goûts pointus avec quelque chose d'accessible pour deux
+5. Le score de compatibilité doit refléter réellement ses goûts (pas juste mettre 90+ partout)
 
 Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau de 3 objets :
 [
@@ -281,20 +277,29 @@ Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau
 
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.8, maxOutputTokens: 2000 }
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.8,
+              maxOutputTokens: 2000,
+              responseMimeType: "application/json"
+            }
           })
         }
       );
       const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
+      if (data.error) {
+        console.error("Gemini error:", JSON.stringify(data.error));
+        throw new Error(data.error.message);
+      }
       let text = data.candidates[0].content.parts[0].text.trim();
       text = text.replace(/```json|```/g, "").trim();
+      // Handle case where Gemini wraps in array or object
+      if (text.startsWith("{")) text = "[" + text + "]";
       return JSON.parse(text);
     } catch (e) {
       console.error("Gemini API error:", e);
@@ -523,21 +528,21 @@ window.Films = {
     reader.onload = async (e) => {
       const lines  = e.target.result.split("\n");
       const header = lines[0].toLowerCase().split(",");
-      const nameIdx   = header.findIndex(h => h.includes("name"));
-      const yearIdx   = header.findIndex(h => h.includes("year"));
-      const ratingIdx = header.findIndex(h => h.includes("rating"));
+      const nameIdx   = header.findIndex(h => h.trim().includes("name"));
+      const yearIdx   = header.findIndex(h => h.trim().includes("year"));
+      const ratingIdx = header.findIndex(h => h.trim() === "rating");
 
       const toAdd = [];
       for (let i = 1; i < lines.length; i++) {
-        // CSV simple — gère les virgules dans les titres (entre guillemets)
         const cols  = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
         const clean = cols.map(c => c.replace(/^"|"$/g, "").trim());
         const title = clean[nameIdx];
         if (!title) continue;
         if (State.films.find(f => f.title.toLowerCase() === title.toLowerCase())) continue;
         const year   = clean[yearIdx] || "";
-        const raw    = parseFloat(clean[ratingIdx]);
-        const rating = isNaN(raw) ? 0 : Math.round(raw);
+        // ratings.csv uses 0.5-5 scale, watched.csv has no rating
+        const raw    = ratingIdx >= 0 ? parseFloat(clean[ratingIdx]) : 0;
+        const rating = isNaN(raw) ? 0 : raw; // keep decimal (e.g. 4.5)
         toAdd.push({ title, year, rating });
       }
 
@@ -545,7 +550,7 @@ window.Films = {
       await fbBulkAddFilms(State.user.uid, toAdd);
       State.films = await fbGetFilms(State.user.uid);
       Films.render();
-      $("import-status").textContent = `✓ ${toAdd.length} films importés !`;
+      $("import-status").textContent = `✓ ${toAdd.length} films importés avec notes !`;
       setTimeout(() => $("import-status").textContent = "", 4000);
       toast(`${toAdd.length} films importés depuis Letterboxd !`);
     };
