@@ -404,20 +404,20 @@ RÈGLES ABSOLUES :
 5. PRIME VIDEO : abonnement de base uniquement, pas de location
 6. Le score de compatibilité doit être honnête (pas tous 90+)
 
-Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau de 10 objets. Sois concis pour tenir dans les tokens :
+Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks), tableau de 10 objets :
 [
   {
-    "title": "Titre",
+    "title": "Titre exact",
     "year": 2019,
     "duration": 125,
     "genre": "Thriller, Drame",
     "platform": "Netflix",
-    "hook": "Accroche max 12 mots",
-    "why": "Justification personnalisée en 1-2 phrases courtes",
-    "synopsis": "Synopsis en 2 phrases max",
+    "hook": "Une accroche cinglante et précise de 10-12 mots qui donne envie",
+    "why": "2-3 phrases personnalisées qui font le lien EXPLICITE avec ses films adorés. Ex: Si tu as mis 5 étoiles à Parasite pour sa tension sociale, tu vas être subjugué par la façon dont ce film...",
+    "synopsis": "3-4 phrases qui résument sans spoiler mais donnent le ton et l'enjeu",
     "director": "Réalisateur",
-    "cast": ["Acteur 1", "Acteur 2"],
-    "trailerQuery": "Titre year trailer",
+    "cast": ["Acteur 1", "Acteur 2", "Acteur 3"],
+    "trailerQuery": "Titre year official trailer",
     "rating": 4.2,
     "compatScore": 92
   }
@@ -965,6 +965,10 @@ window.Settings = {
     }
     const tmdbEl = $("tmdb-key-input");
     if (tmdbEl) tmdbEl.value = getTMDBKey() ? "••••••••••••••••" : "";
+    const omdbEl = $("omdb-key-input");
+    if (omdbEl) omdbEl.value = getOMDbKey() ? "••••••••••••••••" : "";
+    const ytEl = $("youtube-key-input");
+    if (ytEl) ytEl.value = getYouTubeKey() ? "••••••••••••••••" : "";
   },
 
   async savePlatforms() {
@@ -1686,6 +1690,7 @@ fbOnAuth(async (user) => {
     if (State.profile.omdbKey)    localStorage.setItem("cinescope_omdbkey",    State.profile.omdbKey);
     if (State.profile.youtubeKey) localStorage.setItem("cinescope_youtubekey", State.profile.youtubeKey);
   }
+  // Keys are now all loaded from Firebase — no hardcoded fallbacks
 
   Settings.syncUI();
 
