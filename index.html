@@ -592,8 +592,22 @@
       <div class="settings-section">
         <div class="settings-title">Clé API TMDB (affiches)</div>
         <input type="password" id="tmdb-key-input" class="add-input" placeholder="Clé TMDB…" style="width:100%;margin-bottom:8px">
-        <p style="font-size:12px;opacity:.5;margin-bottom:8px">Pour afficher les affiches de films. Gratuit sur themoviedb.org</p>
+        <p style="font-size:12px;opacity:.5;margin-bottom:8px">Pour afficher les affiches. Gratuit sur themoviedb.org</p>
         <button class="btn-sm" onclick="Settings.saveTMDBKey()">Sauvegarder</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Clé API YouTube (trailers)</div>
+        <input type="password" id="youtube-key-input" class="add-input" placeholder="AIza…" style="width:100%;margin-bottom:8px">
+        <p style="font-size:12px;opacity:.5;margin-bottom:8px">Pour les bandes-annonces. Gratuit sur console.cloud.google.com → YouTube Data API v3</p>
+        <button class="btn-sm" onclick="Settings.saveYouTubeKey()">Sauvegarder</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Clé API OMDb (notes presse)</div>
+        <input type="password" id="omdb-key-input" class="add-input" placeholder="Clé OMDb…" style="width:100%;margin-bottom:8px">
+        <p style="font-size:12px;opacity:.5;margin-bottom:8px">Pour IMDb, Rotten Tomatoes, Metacritic. Gratuit sur omdbapi.com</p>
+        <button class="btn-sm" onclick="Settings.saveOMDbKey()">Sauvegarder</button>
       </div>
 
       <div class="settings-section" style="border:none">
