@@ -1013,7 +1013,31 @@ window.Settings = {
     if (State.profile) State.profile.tmdbKey = val;
     toast("Clé TMDB sauvegardée ✓");
     input.value = "••••••••••••••••";
+    input.value = "••••••••••••••••";
+  }  ,
+  async saveOMDbKey() {
+    const input = $("omdb-key-input");
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val || val.startsWith("\u2022")) { toast("Entre une clé OMDb valide.", "warn"); return; }
+    localStorage.setItem("cinescope_omdbkey", val);
+    await fbSaveProfile(State.user.uid, { omdbKey: val });
+    if (State.profile) State.profile.omdbKey = val;
+    toast("Clé OMDb sauvegardée ✓");
+    input.value = "••••••••••••••••";
+  },
+  async saveYouTubeKey() {
+    const input = $("youtube-key-input");
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val || val.startsWith("\u2022")) { toast("Entre une clé YouTube valide.", "warn"); return; }
+    localStorage.setItem("cinescope_youtubekey", val);
+    await fbSaveProfile(State.user.uid, { youtubeKey: val });
+    if (State.profile) State.profile.youtubeKey = val;
+    toast("Clé YouTube sauvegardée ✓");
+    input.value = "••••••••••••••••";
   }
+
 };
 
 // ─── VIEWER SELECTION ─────────────────────────────────────────────────────────
